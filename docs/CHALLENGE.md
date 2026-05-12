@@ -100,7 +100,7 @@ Six things. No weights, no rubric.
 - A **GitHub link** to your repo.
 - A **3–5 minute Loom** covering: what you built, one call you nearly made the other way, and one piece of microcopy you're proud of.
 
-We'll review and follow up to schedule a 60-minute call.
+We'll review and follow up to schedule a follow up call.
 
 ## A note on what we test
 
@@ -113,6 +113,5 @@ A short happy-path checklist lives at [`starter/docs/happy-path.md`](../starter/
 - **Polish matters more when code is cheap.** If AI is typing for you, spend the saved time on taste — the right empty state, the right error message, the right thing to show first.
 - **Ambiguity is a feature.** The brief is intentionally underspecified in places. That's where we want to see your judgment. Document the calls you made.
 - **The reset endpoint is your friend.** `POST /v1/reset` returns your namespace to a clean state. Use it before recording your Loom.
-- **The hosted API stays up.** If it's misbehaving, email us — don't burn 30 minutes debugging the wrong side.
 
 Sharp clarifying questions are welcome; they're a positive signal. Email us.
