@@ -57,7 +57,8 @@ These files are stubs you'll replace. Read [`../docs/CHALLENGE.md`](../docs/CHAL
 |---|---|
 | `app/tech/receive/page.tsx` | The dock-side receive scan. New tag → create. Duplicate tag + matching serial → idempotent. Duplicate tag + different serial → loud error. |
 | `app/tech/store/page.tsx` | Asset scan → storage location scan → commit. |
-| `app/tech/deploy/page.tsx` | Asset scan → deploy location scan (must include rack + ru) → commit. |
+| `app/tech/deploy/page.tsx` | Asset scan → deploy location scan (must include rack + ru) → commit. Should also write back to facilities + finance. |
+| `app/tech/transfer/page.tsx` | Asset scan → receiving party's badge scan → custodian changes; state doesn't. |
 | `app/tech/page.tsx` | Optional tech landing page. |
 
 **Manager (desktop):**

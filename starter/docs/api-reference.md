@@ -82,6 +82,23 @@ Location **must** include `site`, `room`, `rack`, and `ru`. Transitions the asse
 
 Errors: `404 unknown_asset`, `422 invalid_transition`, `422 incomplete_deploy_location`.
 
+### `POST /v1/scans/transfer`
+
+Body:
+
+```ts
+{
+  asset_tag: string;
+  to_custodian: string;   // badge / user_id of the receiving party
+  user_id: string;        // logged-in user — the FROM custodian
+  scan_payload: string;
+}
+```
+
+Changes the custodian only. State is unchanged. Allowed in `received`, `stored`, `in_service`. Rejected when `to_custodian` equals the current custodian.
+
+Errors: `404 unknown_asset`, `422 invalid_transition` (disposed/unreceived), `422 same_custodian`.
+
 ### `GET /v1/mock/facilities/spaces`
 
 Static mock. Returns the facilities-system view of where instruments are physically racked. Different schema from `Asset`:
@@ -97,6 +114,19 @@ Static mock. Returns the facilities-system view of where instruments are physica
 
 Facilities only tracks items currently racked. Items in receiving, storage, or RMA staging won't appear here.
 
+### `POST /v1/mock/facilities/spaces`
+
+Upserts (or removes) a rack location for one asset.
+
+```ts
+{
+  tagged_id: string;
+  rack_location: string | null;   // null removes the row (de-rack)
+}
+```
+
+`last_observed` is set to the current time. Cleared by `/v1/reset`.
+
 ### `GET /v1/mock/finance/equipment`
 
 Static mock. Returns finance's view. Different schema again:
@@ -111,6 +141,22 @@ Static mock. Returns finance's view. Different schema again:
   capitalized_on: string | null;
 }
 ```
+
+### `POST /v1/mock/finance/equipment`
+
+Upserts a finance record for one asset.
+
+```ts
+{
+  tag: string;
+  site?: string;
+  status: "capitalized" | "pending_receipt" | "retired" | "impaired";
+  book_value_usd?: number;
+  capitalized_on?: string | null;
+}
+```
+
+Cleared by `/v1/reset`.
 
 ### `POST /v1/reset`
 
@@ -159,7 +205,7 @@ Wipes the database and re-seeds ~1,000 starter assets. Returns:
 {
   id: string;                 // ulid
   asset_tag: string;
-  event_type: "receive" | "store" | "deploy" | "rma_open" | "rma_receive_back" | "dispose" | "duplicate_receive";
+  event_type: "receive" | "store" | "deploy" | "rma_open" | "rma_receive_back" | "dispose" | "duplicate_receive" | "transfer_custody";
   from_state: string | null;
   to_state: string;
   from_location: Location | null;
@@ -178,8 +224,10 @@ Wipes the database and re-seeds ~1,000 starter assets. Returns:
 | `and_match_failed` | 409 | Receive scan: tag exists, serial doesn't match |
 | `invalid_transition` | 422 | State machine rejects |
 | `invalid_location` | 422 | Location doesn't conform to schema |
+| `invalid_payload` | 422 | Mock write body fails validation |
 | `incomplete_deploy_location` | 422 | Deploy is missing site/room/rack/ru |
 | `invalid_tag_format` | 400 | asset_tag doesn't match `/^C\d{7}$/` |
+| `same_custodian` | 422 | Transfer `to_custodian` matches the current custodian |
 | `internal_error` | 500 | Unexpected |
 
 ## State machine
@@ -203,4 +251,4 @@ unreceived → received → stored ⇄ in_service → rma_pending → received (
 | `rma_pending` | `received` | rma_receive_back |
 | `rma_pending` | `disposed` | dispose |
 
-Only `receive`, `store`, `deploy` are exposed as endpoints in v1.
+Only `receive`, `store`, `deploy`, and `transfer_custody` (state-preserving) are exposed as scan endpoints in v1.

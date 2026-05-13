@@ -40,6 +40,11 @@ export default function HomePage() {
                 /tech/deploy
               </Link>
             </li>
+            <li>
+              <Link className="text-blue-700 hover:underline" href="/tech/transfer">
+                /tech/transfer
+              </Link>
+            </li>
           </ul>
         </div>
 

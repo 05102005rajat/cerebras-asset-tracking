@@ -5,9 +5,12 @@ import type {
   DeployScanInput,
   Event,
   FacilitiesRecord,
+  FacilitiesUpdate,
   FinanceRecord,
+  FinanceUpdate,
   ReceiveScanInput,
   StoreScanInput,
+  TransferScanInput,
 } from "./types.js";
 
 // In the browser, the default client talks to the same-origin proxy at
@@ -140,12 +143,18 @@ export function createApiClient(cfg: ClientConfig = {}) {
         request<Asset>("POST", "/scans/store", cfg, input),
       deploy: (input: DeployScanInput) =>
         request<Asset>("POST", "/scans/deploy", cfg, input),
+      transfer: (input: TransferScanInput) =>
+        request<Asset>("POST", "/scans/transfer", cfg, input),
     },
     mock: {
       facilities: () =>
         request<FacilitiesRecord[]>("GET", "/mock/facilities/spaces", cfg),
       finance: () =>
         request<FinanceRecord[]>("GET", "/mock/finance/equipment", cfg),
+      updateFacilities: (input: FacilitiesUpdate) =>
+        request<{ ok: true }>("POST", "/mock/facilities/spaces", cfg, input),
+      updateFinance: (input: FinanceUpdate) =>
+        request<{ ok: true }>("POST", "/mock/finance/equipment", cfg, input),
     },
     reset: () =>
       request<{ ok: true; reseeded_at: string }>("POST", "/reset", cfg),

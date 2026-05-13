@@ -47,6 +47,18 @@ Keep the join in `app/api/reconcile/route.ts`, not in the page. The join is test
 
 A reset button in dev UI is fine; don't leave one on a production surface.
 
+## Writing back to facilities and finance
+
+The mocks accept POSTs. The expected pattern:
+
+- A successful `deploy` → POST to `/v1/mock/facilities/spaces` (set rack location) and `/v1/mock/finance/equipment` (status: `capitalized`).
+- A successful `store` *from* `in_service` → POST to `/v1/mock/facilities/spaces` with `rack_location: null` to remove the row.
+- Receive, store-from-received, and transfer don't trigger writes.
+
+Where you fire the write matters: doing it in the browser ships the token; doing it in your scan API route doesn't. The same security argument as the reconcile route applies.
+
+If you skip these, your reconcile report will show drift on every freshly-deployed asset. Use that as a unit test.
+
 ## Common misses
 
 - The match logic on receive: a duplicate tag with a matching serial is idempotent; a duplicate tag with a *different* serial is an error. Both cases real at the dock.

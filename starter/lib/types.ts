@@ -20,7 +20,8 @@ export type EventType =
   | "rma_open"
   | "rma_receive_back"
   | "dispose"
-  | "duplicate_receive";
+  | "duplicate_receive"
+  | "transfer_custody";
 
 export type Location = {
   site: string;
@@ -105,6 +106,26 @@ export type DeployScanInput = {
   location: Location;
   user_id: string;
   scan_payload: string;
+};
+
+export type TransferScanInput = {
+  asset_tag: string;
+  to_custodian: string;
+  user_id: string;
+  scan_payload: string;
+};
+
+export type FacilitiesUpdate = {
+  tagged_id: string;
+  rack_location: string | null;
+};
+
+export type FinanceUpdate = {
+  tag: string;
+  site?: string;
+  status: "capitalized" | "pending_receipt" | "retired" | "impaired";
+  book_value_usd?: number;
+  capitalized_on?: string | null;
 };
 
 export type AssetListFilters = {

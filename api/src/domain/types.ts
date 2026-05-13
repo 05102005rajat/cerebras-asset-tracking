@@ -29,6 +29,7 @@ export const EventTypeSchema = z.enum([
   "rma_receive_back",
   "dispose",
   "duplicate_receive",
+  "transfer_custody",
 ]);
 export type EventType = z.infer<typeof EventTypeSchema>;
 
@@ -98,6 +99,29 @@ export const DeployScanInputSchema = z.object({
   scan_payload: z.string(),
 });
 export type DeployScanInput = z.infer<typeof DeployScanInputSchema>;
+
+export const TransferScanInputSchema = z.object({
+  asset_tag: z.string(),
+  to_custodian: z.string().min(1),
+  user_id: z.string().min(1),
+  scan_payload: z.string(),
+});
+export type TransferScanInput = z.infer<typeof TransferScanInputSchema>;
+
+export const FacilitiesUpdateSchema = z.object({
+  tagged_id: z.string(),
+  rack_location: z.string().nullable(),
+});
+export type FacilitiesUpdate = z.infer<typeof FacilitiesUpdateSchema>;
+
+export const FinanceUpdateSchema = z.object({
+  tag: z.string(),
+  site: z.string().optional(),
+  status: z.enum(["capitalized", "pending_receipt", "retired", "impaired"]),
+  book_value_usd: z.number().optional(),
+  capitalized_on: z.string().nullable().optional(),
+});
+export type FinanceUpdate = z.infer<typeof FinanceUpdateSchema>;
 
 export type FacilitiesRecord = {
   space_id: string;

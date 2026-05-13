@@ -206,6 +206,116 @@ describe("scans: store + deploy + transitions", () => {
   });
 });
 
+describe("scans: transfer", () => {
+  beforeEach(() => {
+    resetDb();
+  });
+
+  it("transfers custody on an in_service asset; state unchanged, custodian updated", async () => {
+    const before = await inject("GET", "/v1/assets/C0000101");
+    const beforeBody = before.json() as Asset;
+    expect(beforeBody.state).toBe("in_service");
+    expect(beforeBody.custodian).toBe("tech-jane");
+
+    const res = await inject("POST", "/v1/scans/transfer", {
+      asset_tag: "C0000101",
+      to_custodian: "tech-mike",
+      user_id: "tech-jane",
+      scan_payload: "TRANSFER|C0000101|tech-mike",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Asset;
+    expect(body.state).toBe("in_service");
+    expect(body.custodian).toBe("tech-mike");
+
+    const eventsRes = await inject("GET", "/v1/assets/C0000101/events");
+    const events = eventsRes.json() as Event[];
+    expect(events[0]!.event_type).toBe("transfer_custody");
+    expect(events[0]!.user_id).toBe("tech-jane");
+  });
+
+  it("rejects transfer when to_custodian equals current custodian", async () => {
+    const res = await inject("POST", "/v1/scans/transfer", {
+      asset_tag: "C0000101",
+      to_custodian: "tech-jane",
+      user_id: "tech-jane",
+      scan_payload: "TRANSFER|C0000101|tech-jane",
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe("same_custodian");
+  });
+
+  it("rejects transfer on a disposed asset", async () => {
+    const res = await inject("POST", "/v1/scans/transfer", {
+      asset_tag: "C0000109",
+      to_custodian: "tech-mike",
+      user_id: "tech-jane",
+      scan_payload: "TRANSFER|C0000109|tech-mike",
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe("invalid_transition");
+  });
+});
+
+describe("mock writes", () => {
+  beforeEach(() => {
+    resetDb();
+  });
+
+  it("POST /v1/mock/facilities/spaces upserts a rack location; GET reflects it", async () => {
+    const post = await inject("POST", "/v1/mock/facilities/spaces", {
+      tagged_id: "C0000101",
+      rack_location: "Lab-Building-Z/Test-1/Aisle-9/X-99/U99",
+    });
+    expect(post.statusCode).toBe(200);
+
+    const get = await inject("GET", "/v1/mock/facilities/spaces");
+    const rows = get.json() as Array<{ tagged_id: string; rack_location: string }>;
+    const row = rows.find((r) => r.tagged_id === "C0000101");
+    expect(row?.rack_location).toBe("Lab-Building-Z/Test-1/Aisle-9/X-99/U99");
+  });
+
+  it("POST /v1/mock/facilities/spaces with null rack_location removes the row", async () => {
+    const post = await inject("POST", "/v1/mock/facilities/spaces", {
+      tagged_id: "C0000101",
+      rack_location: null,
+    });
+    expect(post.statusCode).toBe(200);
+
+    const get = await inject("GET", "/v1/mock/facilities/spaces");
+    const rows = get.json() as Array<{ tagged_id: string }>;
+    expect(rows.find((r) => r.tagged_id === "C0000101")).toBeUndefined();
+  });
+
+  it("POST /v1/mock/finance/equipment upserts status; GET reflects it", async () => {
+    const post = await inject("POST", "/v1/mock/finance/equipment", {
+      tag: "C0000107",
+      status: "capitalized",
+      book_value_usd: 99999,
+    });
+    expect(post.statusCode).toBe(200);
+
+    const get = await inject("GET", "/v1/mock/finance/equipment");
+    const rows = get.json() as Array<{ tag: string; status: string; book_value_usd: number }>;
+    const row = rows.find((r) => r.tag === "C0000107");
+    expect(row?.status).toBe("capitalized");
+    expect(row?.book_value_usd).toBe(99999);
+  });
+
+  it("reset clears mock overlays", async () => {
+    await inject("POST", "/v1/mock/facilities/spaces", {
+      tagged_id: "C0000101",
+      rack_location: "Lab-Building-Z/Test-1/Aisle-9/X-99/U99",
+    });
+    await inject("POST", "/v1/reset");
+
+    const get = await inject("GET", "/v1/mock/facilities/spaces");
+    const rows = get.json() as Array<{ tagged_id: string; rack_location: string }>;
+    const row = rows.find((r) => r.tagged_id === "C0000101");
+    expect(row?.rack_location).toBe("Lab-Building-A/Bay-12/Aisle-3/B-04/P-02");
+  });
+});
+
 describe("reset", () => {
   it("reset wipes new assets and re-seeds the fixture", async () => {
     resetDb();

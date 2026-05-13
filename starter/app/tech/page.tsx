@@ -26,6 +26,11 @@ export default function TechLandingPage() {
             Deploy
           </Link>
         </li>
+        <li>
+          <Link className="text-blue-700 hover:underline" href="/tech/transfer">
+            Transfer custody
+          </Link>
+        </li>
       </ul>
     </div>
   );

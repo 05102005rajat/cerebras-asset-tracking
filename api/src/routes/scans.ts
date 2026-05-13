@@ -4,6 +4,7 @@ import {
   DeployScanInputSchema,
   ReceiveScanInputSchema,
   StoreScanInputSchema,
+  TransferScanInputSchema,
 } from "../domain/types.js";
 import type { Asset, Event } from "../domain/types.js";
 import {
@@ -198,6 +199,63 @@ export async function scansRoutes(app: FastifyInstance): Promise<void> {
       to_state: "in_service",
       from_location: asset.location,
       to_location: input.location,
+      user_id: input.user_id,
+      scan_payload: input.scan_payload,
+      timestamp: now,
+    };
+    insertEvent(db, event);
+    return reply.send(getAsset(db, asset.asset_tag));
+  });
+
+  // POST /v1/scans/transfer
+  // Two-sided custody: the logged-in user (user_id) is the FROM custodian;
+  // to_custodian is the badge of the receiving party. State doesn't change.
+  app.post("/v1/scans/transfer", async (req, reply) => {
+    const parse = TransferScanInputSchema.safeParse(req.body);
+    if (!parse.success) {
+      return sendError(reply, 422, "invalid_location", "Invalid transfer payload", {
+        issues: parse.error.issues,
+      });
+    }
+    const input = parse.data;
+    const db = getDb();
+    const asset = getAsset(db, input.asset_tag);
+    if (!asset) {
+      return sendError(reply, 404, "unknown_asset", `Asset ${input.asset_tag} not found`);
+    }
+    if (asset.state === "disposed" || asset.state === "unreceived") {
+      return sendError(
+        reply,
+        422,
+        "invalid_transition",
+        `Cannot transfer custody of an asset in state '${asset.state}'`,
+        { from_state: asset.state, attempted_event: "transfer_custody" },
+      );
+    }
+    if (input.to_custodian === asset.custodian) {
+      return sendError(
+        reply,
+        422,
+        "same_custodian",
+        "to_custodian is already the current custodian",
+        { custodian: asset.custodian },
+      );
+    }
+    const now = new Date().toISOString();
+    updateAsset(db, asset.asset_tag, {
+      state: asset.state,
+      location: asset.location,
+      custodian: input.to_custodian,
+      updated_at: now,
+    });
+    const event: Event = {
+      id: ulid(),
+      asset_tag: asset.asset_tag,
+      event_type: "transfer_custody",
+      from_state: asset.state,
+      to_state: asset.state,
+      from_location: asset.location,
+      to_location: asset.location,
       user_id: input.user_id,
       scan_payload: input.scan_payload,
       timestamp: now,

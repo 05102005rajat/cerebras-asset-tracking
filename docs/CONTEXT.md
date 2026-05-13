@@ -38,6 +38,4 @@ Don't build these. But if your design would prevent layering them on later, flag
 
 - Parent-child relationships (chassis with serialized blades).
 - Offline scan queueing.
-- Bidirectional writes to facilities and finance.
-- Two-sided custody handoffs with badge scans on both ends.
 - Tracking the barcode tags themselves as their own assets.

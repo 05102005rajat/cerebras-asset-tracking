@@ -1,6 +1,6 @@
 # Asset tracking — take-home challenge
 
-**Time:** ~8 hours of focused work.
+**Time:** ~10–12 hours of focused work, spread however you like.
 **AI tools:** Encouraged. They speed up typing; they don't replace judgment.
 **Stack:** Next.js (App Router) + TypeScript + Tailwind. Swap libraries inside the stack, not the stack itself.
 **Deliverable:** A deployed URL, a repo link, and a 3–5 minute Loom.
@@ -39,9 +39,11 @@ Background on why this kind of system exists: [`docs/CONTEXT.md`](./CONTEXT.md).
 
 ### 1. Scan workflows under `/tech`
 
-Three screens — `/tech/receive`, `/tech/store`, `/tech/deploy`. Picture the user: a lab tech at 11pm in a cold dock bay, gloves on, scanner in one hand, a 40lb instrument in the other. Build for that person.
+Four screens — `/tech/receive`, `/tech/store`, `/tech/deploy`, `/tech/transfer`. Picture the user: a lab tech at 11pm in a cold dock bay, gloves on, scanner in one hand, a 40lb instrument in the other. Build for that person.
 
 The tech's device can be either: (a) a desktop or tablet with a USB/Bluetooth handheld scanner that types into the focused input and presses Enter, or (b) **a phone using its camera as the scanner**. Both flows should feel native. For the camera path, pick a library — `@zxing/browser` and `html5-qrcode` are both fine; we expect you'll lean on AI to wire it up.
+
+`/tech/transfer` is a two-sided custody handoff. Scan the asset, then scan the receiving party's badge. The logged-in user is the *from* side automatically — only the receiving side gets an explicit scan. State doesn't change; custodian does. The badge value is just the receiving user's ID (`tech-mike`, `manager-paul`, etc.).
 
 The API enforces the rules (state machine, idempotency on duplicate receive, location completeness for deploy — see [`api-reference.md`](../starter/docs/api-reference.md)). The interesting decisions sit above the API: what does a successful scan feel like? What does a confusing scan feel like? What's the recovery path when the tech messes up?
 
@@ -55,7 +57,19 @@ Two screens — `/manager` (asset list) and `/manager/assets/[tag]` (asset detai
 
 The event log is the manager's main forensic tool — surface it well.
 
-### 3. Three-way reconciliation
+### 3. Writing back to facilities and finance
+
+The facilities and finance mocks also accept POSTs — they're not read-only. On a successful scan, your app should keep them in sync:
+
+- **deploy** (asset enters service) → POST to facilities (asset now at this rack) and finance (capitalize it).
+- **store from `in_service`** (de-racking) → POST to facilities with `rack_location: null` to remove it.
+- All other scans don't write — receive/store-from-received/transfer leave facilities and finance untouched.
+
+GET-after-POST reflects your write. `/v1/reset` clears the writes. If you skip this, your reconciliation report will show drift after every deploy — useful for testing, but not the desired end state.
+
+Decide where the writes live (client, proxy, server route handler). Same token-security argument as the reconcile route. Explain in your README.
+
+### 4. Three-way reconciliation
 
 The API exposes operations data plus two mocks at `GET /v1/mock/facilities/spaces` and `GET /v1/mock/finance/equipment`. The schemas differ from operations and from each other deliberately.
 
