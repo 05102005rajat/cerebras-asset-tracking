@@ -5,7 +5,7 @@ A take-home challenge for software engineering interns. Candidates build a front
 This is a **monorepo** with two apps you run side by side:
 
 - [`api/`](./api) — small Node/Fastify backend with a seeded SQLite database. Candidates don't modify it.
-- [`starter/`](./starter) — the Next.js starter that candidates fork. Has the API client wired up, types, primitives, and stub pages.
+- [`starter/`](./starter) — the Next.js starter that candidates fork. API client, types, base components, and stub pages already wired up.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ pnpm dev
 
 Open http://localhost:3000.
 
-The starter reads `API_BASE_URL` and `API_TOKEN` from `starter/.env` (defaults: `http://localhost:8080/v1` and a placeholder token). Copy `starter/.env.example` to `starter/.env` if you don't have one. Both are server-side only — the browser talks to a proxy at `/api/upstream` that attaches the token, so it never reaches the client.
+The starter reads `API_BASE_URL` and `API_TOKEN` from `starter/.env`. Copy `starter/.env.example` to `starter/.env` if you don't have one. Both are server-side only — the browser hits a proxy at `/api/upstream` that adds the token, so it never reaches the client.
 
 ## What's in here
 

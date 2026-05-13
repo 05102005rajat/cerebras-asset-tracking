@@ -19,7 +19,7 @@ We will read every README. We will watch every Loom. Both count as much as the c
 
 A hosted API holds ~1,000 seeded assets, an event log per asset, three scan endpoints (receive, store, deploy), and two static mocks for facilities and finance. You build the UX on top. `POST /v1/reset` wipes your namespace clean.
 
-Volume matters: at ~1,000 rows your manager list can't just be a dump, your reconciliation report has signal-to-noise, and edge cases on pagination/loading/empty-states actually surface. A dozen of the seeded assets carry deliberately-engineered cross-system disagreements; the rest are clean.
+At ~1,000 rows your manager list needs real pagination and filtering, and edge cases on loading and empty states actually surface. A dozen of the seeded assets disagree across systems on purpose; the rest are clean.
 
 Read [`docs/api-reference.md`](../starter/docs/api-reference.md) — it's the contract.
 
@@ -33,7 +33,7 @@ A multi-site research lab tracks thousands of instruments — sequencers, mass s
 
 They drift apart constantly. Your job is to make all three usable enough that techs don't skip scans and managers can act.
 
-For more narrative on *why* this kind of system exists and how the three pieces are supposed to relate, see [`docs/CONTEXT.md`](./CONTEXT.md). Optional reading — sharpens your judgment on the reconciliation report especially.
+Background on why this kind of system exists: [`docs/CONTEXT.md`](./CONTEXT.md). Optional.
 
 ## What to build
 
@@ -74,8 +74,8 @@ Out of scope. Use the cookie-based role switcher (`<RoleSwitcher>` in the header
 
 Save time by not building:
 
-- Bluetooth pairing UI or scanner hardware probing. USB scanners present as keyboards; trust that. Camera scanning runs in the browser.
-- Backend hardening (rate limit tuning, retries, queuing). The hosted API is rate-limited at 60 req/min/token.
+- Hardware integration. A USB/Bluetooth scanner types into your input like a keyboard; a phone camera decodes via a JS library. No driver code, no pairing flow.
+- Backend hardening (rate limit tuning, retries, queuing). The API is rate-limited at 60 req/min.
 - The RMA workflow. The state machine supports it; you don't need a UI.
 - Offline mode, syncing, conflict resolution.
 - Brand styling. Tailwind defaults are fine — just make conscious choices.

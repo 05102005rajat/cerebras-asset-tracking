@@ -96,10 +96,8 @@ pnpm lint         # next lint
 
 | Variable | Notes |
 |---|---|
-| `API_BASE_URL` | Upstream API including `/v1`, e.g. `https://asset-tracking-challenge-api.example.com/v1` |
-| `API_TOKEN` | Your assigned bearer token. Server-only — do **not** use `NEXT_PUBLIC_`. |
-
-> Both are read server-side. The starter never reads them in browser code. If you find yourself reaching for `NEXT_PUBLIC_API_TOKEN`, stop — the proxy at `app/api/upstream/[...path]/route.ts` is the right way to talk to the upstream API from a Client Component.
+| `API_BASE_URL` | Upstream API including `/v1`, e.g. `http://localhost:8080/v1` |
+| `API_TOKEN` | Server-only. Do **not** prefix with `NEXT_PUBLIC_`. Browser code hits `/api/upstream/*` instead. |
 
 ## Submitting
 

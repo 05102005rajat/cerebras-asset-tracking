@@ -67,7 +67,7 @@ Body:
 { asset_tag, location, user_id, scan_payload }
 ```
 
-Transitions the asset to `stored`. Allowed from `received` or `in_service` (de-rack).
+Transitions the asset to `stored`. Allowed from `received` or `in_service` (removing it from a rack back into storage).
 Errors: `404 unknown_asset`, `422 invalid_transition`.
 
 ### `POST /v1/scans/deploy`
@@ -95,7 +95,7 @@ Static mock. Returns the facilities-system view of where instruments are physica
 }
 ```
 
-Facilities doesn't track non-racked items (received, stored, RMA).
+Facilities only tracks items currently racked. Items in receiving, storage, or RMA staging won't appear here.
 
 ### `GET /v1/mock/finance/equipment`
 
@@ -130,7 +130,7 @@ Wipes the database and re-seeds ~1,000 starter assets. Returns:
   room: string | null;
   row: string | null;
   rack: string | null;
-  ru: string | null;
+  ru: string | null;   // vertical position inside a rack
 }
 ```
 
@@ -197,7 +197,7 @@ unreceived → received → stored ⇄ in_service → rma_pending → received (
 | `received` | `in_service` | deploy |
 | `stored` | `in_service` | deploy |
 | `stored` | `disposed` | dispose |
-| `in_service` | `stored` | store (de-rack) |
+| `in_service` | `stored` | store |
 | `in_service` | `rma_pending` | rma_open |
 | `in_service` | `disposed` | dispose |
 | `rma_pending` | `received` | rma_receive_back |

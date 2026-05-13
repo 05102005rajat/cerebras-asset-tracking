@@ -17,7 +17,7 @@ Or from this directory:
 pnpm dev
 ```
 
-First start creates `data/asset-tracking.db` and seeds 12 assets plus the facilities/finance mocks. Subsequent starts reuse the file.
+First start creates `data/asset-tracking.db` and seeds ~1,000 assets plus the facilities/finance mocks. Subsequent starts reuse the file.
 
 ## Reset the database
 
@@ -42,11 +42,10 @@ sqlite> SELECT asset_tag, state, custodian FROM assets;
 pnpm --filter @asset-tracking/api test
 ```
 
-Three suites:
+Two suites:
 
-- `test/state-machine.test.ts` — every allowed transition succeeds and every undefined transition is rejected.
-- `test/scans.test.ts` — receive (new / idempotent duplicate / and-match failure), store, deploy, missing-asset 404s, reset.
-- `test/reconcile-data.test.ts` — verifies the 9 deliberately-engineered cross-system mismatches in the seed data are present.
+- `test/state-machine.test.ts` — every allowed transition succeeds; every undefined transition is rejected.
+- `test/scans.test.ts` — receive (new, duplicate, mismatched serial), store, deploy, missing asset, reset.
 
 ## Build for production
 
