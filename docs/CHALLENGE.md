@@ -47,7 +47,7 @@ The API enforces the rules (state machine, idempotency on duplicate receive, loc
 
 Use the included `<ScanInput>` as a starting point or replace it.
 
-**Deliverable: barcodes we can actually scan.** Ship some way — a `/dev/barcodes` page, a printable PDF, a one-shot script, your call — to generate scannable Code 128 (or QR) barcodes for a handful of assets (covering the interesting cases — drifted, ghost/orphan, disposed) and a handful of locations. We'll print them and use them in the review call. Don't make us type tags by hand. You decide which tags are worth printing.
+**Deliverable: barcodes we can actually scan.** Ship some way — a `/dev/barcodes` page, a printable PDF, a one-shot script, your call — to generate scannable Code 128 (or QR) barcodes for a handful of assets (covering the interesting cases — drifted, ghost/orphan, disposed) and a handful of locations.
 
 ### 2. Manager dashboard under `/manager`
 
