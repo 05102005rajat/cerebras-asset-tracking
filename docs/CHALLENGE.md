@@ -96,6 +96,10 @@ Six things. No weights, no rubric.
 
 ## How to submit
 
+Fill out this form: **https://forms.gle/6gxhe8Js98KGqSDx8**
+
+You'll be asked for:
+
 - A **public URL** where the app runs. The Vercel one-click button in the starter's README works.
 - A **GitHub link** to your repo.
 - A **3–5 minute Loom** covering: what you built, one call you nearly made the other way, and one piece of microcopy you're proud of.

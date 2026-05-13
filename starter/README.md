@@ -103,4 +103,4 @@ pnpm lint         # next lint
 
 ## Submitting
 
-See [`../docs/CHALLENGE.md`](../docs/CHALLENGE.md) — TL;DR is a deployed URL, your repo, and a 3–5 minute Loom.
+Fill out **https://forms.gle/6gxhe8Js98KGqSDx8** with your deployed URL, repo link, and 3–5 minute Loom. Full details in [`../docs/CHALLENGE.md`](../docs/CHALLENGE.md).
