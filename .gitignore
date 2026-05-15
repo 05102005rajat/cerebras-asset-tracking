@@ -1,17 +1,6 @@
-# Maintainer-only notes (taxonomy, planted-trap docs, seed-integrity test).
-# Kept locally; never pushed.
-.maintainer/
-
-node_modules/
-dist/
-build/
-.next/
-out/
-coverage/
-*.log
-.DS_Store
+node_modules
+.next
 .env
 .env.local
-api/data/
-!api/data/.gitkeep
-*.tsbuildinfo
+*.log
+.DS_Store
