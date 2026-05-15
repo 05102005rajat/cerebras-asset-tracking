@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ScanField } from "@/components/ScanField";
+import { ScanField, type ScanFieldHandle } from "@/components/ScanField";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { ScanLog, type ScanLogEntry } from "@/components/ScanLog";
@@ -14,6 +14,7 @@ import {
   parseBadgePayload,
 } from "@/lib/locations";
 import { getCurrentUserId } from "@/lib/auth";
+import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { Asset } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
 
@@ -30,26 +31,25 @@ export default function TechTransferPage() {
   } | null>(null);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const [me, setMe] = useState<string>("");
-  const successTimer = useRef<number | null>(null);
+  const assetRef = useRef<ScanFieldHandle>(null);
+  const badgeRef = useRef<ScanFieldHandle>(null);
 
   useEffect(() => {
     setMe(getCurrentUserId());
-    return () => {
-      if (successTimer.current) window.clearTimeout(successTimer.current);
-    };
   }, []);
 
   function reset(): void {
     setPhase("scan_asset");
     setAsset(null);
     setError(null);
+    requestAnimationFrame(() => assetRef.current?.focus());
   }
 
-  function flashSuccess(entry: {
+  function recordSuccess(entry: {
     asset: Asset;
     message: string;
     sideEffects: SideEffect[];
-  }) {
+  }): void {
     setSuccess(entry);
     setLog((l) => [
       {
@@ -61,17 +61,29 @@ export default function TechTransferPage() {
       },
       ...l,
     ]);
-    if (successTimer.current) window.clearTimeout(successTimer.current);
-    successTimer.current = window.setTimeout(() => {
-      setSuccess(null);
-      reset();
-    }, 4000);
+    tactileSuccess();
+    reset();
+  }
+
+  function recordError(err: unknown, asset_tag?: string): void {
+    setError(err);
+    tactileError();
+    setLog((l) => [
+      {
+        at: Date.now(),
+        outcome: "error",
+        asset_tag,
+        message: err instanceof Error ? err.message : "Scan failed",
+      },
+      ...l,
+    ]);
   }
 
   async function handleAssetScan(value: string): Promise<void> {
     if (!isAssetTag(value)) {
-      setError(
+      recordError(
         new ApiError(400, "invalid_tag_format", `"${value}" isn't a tag.`),
+        value,
       );
       return;
     }
@@ -81,9 +93,10 @@ export default function TechTransferPage() {
       const a = await fetchAsset(value);
       setAsset(a);
       setPhase("scan_badge");
+      requestAnimationFrame(() => badgeRef.current?.focus());
     } catch (e) {
-      setError(e);
       setPhase("scan_asset");
+      recordError(e, value);
     }
   }
 
@@ -93,12 +106,13 @@ export default function TechTransferPage() {
     if (isBadgePayload(value)) {
       const parsed = parseBadgePayload(value);
       if (!parsed) {
-        setError(
+        recordError(
           new ApiError(
             400,
             "invalid_badge",
             "Badge code is malformed. Expected BADGE|user-id.",
           ),
+          asset.asset_tag,
         );
         return;
       }
@@ -106,12 +120,13 @@ export default function TechTransferPage() {
     }
 
     if (badge === me) {
-      setError(
+      recordError(
         new ApiError(
           422,
           "self_transfer",
           "You scanned your own badge. Scan the receiving tech's badge.",
         ),
+        asset.asset_tag,
       );
       return;
     }
@@ -123,14 +138,14 @@ export default function TechTransferPage() {
         asset_tag: asset.asset_tag,
         to_custodian: badge,
       });
-      flashSuccess({
+      recordSuccess({
         asset: result.asset,
         message: `Custody → ${badge}`,
         sideEffects: result.side_effects,
       });
     } catch (e) {
-      setError(e);
       setPhase("scan_badge");
+      recordError(e, asset.asset_tag);
     }
   }
 
@@ -149,15 +164,19 @@ export default function TechTransferPage() {
           asset={success.asset}
           message={success.message}
           sideEffects={success.sideEffects}
+          onDismiss={() => setSuccess(null)}
         />
       ) : null}
 
       {phase === "scan_asset" || phase === "loading_asset" ? (
         <ScanField
+          ref={assetRef}
           label="1. Scan the asset"
           placeholder="C0009001"
+          hint="Esc clears."
           disabled={phase === "loading_asset"}
           onScan={handleAssetScan}
+          onEscape={reset}
         />
       ) : null}
 
@@ -165,17 +184,19 @@ export default function TechTransferPage() {
         <>
           <AssetSummary asset={asset} />
           <ScanField
+            ref={badgeRef}
             label="2. Scan the receiving tech's badge"
             placeholder="BADGE|tech-mike or just tech-mike"
-            hint="Badge can be scanned or typed."
+            hint="Badge can be scanned or typed. Esc clears."
             disabled={phase === "submitting"}
             onScan={handleBadgeScan}
+            onEscape={reset}
           />
           <button
             onClick={reset}
             className="text-sm text-gray-600 hover:text-gray-900 underline"
           >
-            Different asset
+            Different asset (Esc)
           </button>
         </>
       ) : null}

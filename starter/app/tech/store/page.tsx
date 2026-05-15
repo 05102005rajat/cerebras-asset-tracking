@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ScanField } from "@/components/ScanField";
+import { useRef, useState } from "react";
+import { ScanField, type ScanFieldHandle } from "@/components/ScanField";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { ScanLog, type ScanLogEntry } from "@/components/ScanLog";
@@ -10,6 +10,7 @@ import { AssetSummary } from "@/components/AssetSummary";
 import { clientScans, fetchAsset } from "@/lib/client-scans";
 import { ApiError } from "@/lib/api-client";
 import { isAssetTag, emptyLocation } from "@/lib/locations";
+import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { Asset, Location } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
 
@@ -28,26 +29,22 @@ export default function TechStorePage() {
     sideEffects: SideEffect[];
   } | null>(null);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
-  const successTimer = useRef<number | null>(null);
+  const scanRef = useRef<ScanFieldHandle>(null);
 
   function reset(): void {
     setPhase("scan_tag");
     setAsset(null);
     setLocation(emptyLocation(location.site || "Lab-Building-A"));
     setError(null);
+    // Refocus on next paint so the input is mounted before we grab focus.
+    requestAnimationFrame(() => scanRef.current?.focus());
   }
 
-  useEffect(() => {
-    return () => {
-      if (successTimer.current) window.clearTimeout(successTimer.current);
-    };
-  }, []);
-
-  function flashSuccess(entry: {
+  function recordSuccess(entry: {
     asset: Asset;
     message: string;
     sideEffects: SideEffect[];
-  }) {
+  }): void {
     setSuccess(entry);
     setLog((l) => [
       {
@@ -59,17 +56,35 @@ export default function TechStorePage() {
       },
       ...l,
     ]);
-    if (successTimer.current) window.clearTimeout(successTimer.current);
-    successTimer.current = window.setTimeout(() => {
-      setSuccess(null);
-      reset();
-    }, 4000);
+    tactileSuccess();
+    // Continuous-scan: success banner stays visible at the top, and the form
+    // resets immediately so the next scan can begin without waiting.
+    reset();
+  }
+
+  function recordError(err: unknown, asset_tag?: string): void {
+    setError(err);
+    tactileError();
+    setLog((l) => [
+      {
+        at: Date.now(),
+        outcome: "error",
+        asset_tag,
+        message: err instanceof Error ? err.message : "Scan failed",
+      },
+      ...l,
+    ]);
   }
 
   async function handleTagScan(value: string): Promise<void> {
     if (!isAssetTag(value)) {
-      setError(
-        new ApiError(400, "invalid_tag_format", `"${value}" isn't a valid tag.`),
+      recordError(
+        new ApiError(
+          400,
+          "invalid_tag_format",
+          `"${value}" isn't a valid tag.`,
+        ),
+        value,
       );
       return;
     }
@@ -85,17 +100,8 @@ export default function TechStorePage() {
         setLocation((prev) => ({ ...prev, site: a.location.site }));
       }
     } catch (e) {
-      setError(e);
       setPhase("scan_tag");
-      setLog((l) => [
-        {
-          at: Date.now(),
-          outcome: "error",
-          asset_tag: value,
-          message: e instanceof Error ? e.message : "Lookup failed",
-        },
-        ...l,
-      ]);
+      recordError(e, value);
     }
   }
 
@@ -113,23 +119,14 @@ export default function TechStorePage() {
         location,
       });
       const wasInService = asset.state === "in_service";
-      flashSuccess({
+      recordSuccess({
         asset: result.asset,
         message: wasInService ? "Stored — pulled from rack" : "Stored",
         sideEffects: result.side_effects,
       });
     } catch (e) {
-      setError(e);
       setPhase("scan_location");
-      setLog((l) => [
-        {
-          at: Date.now(),
-          outcome: "error",
-          asset_tag: asset.asset_tag,
-          message: e instanceof Error ? e.message : "Store failed",
-        },
-        ...l,
-      ]);
+      recordError(e, asset.asset_tag);
     }
   }
 
@@ -148,15 +145,19 @@ export default function TechStorePage() {
           asset={success.asset}
           message={success.message}
           sideEffects={success.sideEffects}
+          onDismiss={() => setSuccess(null)}
         />
       ) : null}
 
       {phase === "scan_tag" || phase === "loading_asset" ? (
         <ScanField
+          ref={scanRef}
           label="Scan the asset"
           placeholder="C0009001"
+          hint="Esc clears. Continuous-scan: each successful store re-arms the input."
           disabled={phase === "loading_asset"}
           onScan={handleTagScan}
+          onEscape={reset}
         />
       ) : null}
 
@@ -185,7 +186,7 @@ export default function TechStorePage() {
               onClick={reset}
               className="text-sm text-gray-600 hover:text-gray-900 underline"
             >
-              Different asset
+              Different asset (Esc)
             </button>
           </div>
         </>

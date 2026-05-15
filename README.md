@@ -4,10 +4,10 @@ Submission for the Cerebras AI Builder Challenge (asset tracking).
 
 A multi-site research lab tracks instruments across three systems that disagree by default — operations, facilities, finance. This app is the place techs and managers come to keep them aligned.
 
-- **Tech surface (`/tech`)**: receive, store, deploy, transfer. Built for one hand on a phone in a cold dock bay. Keyboard-wedge scanners and phone cameras both work.
-- **Manager surface (`/manager`)**: paginated, filterable asset list with a drift topline that tells the manager whether anything actually needs them.
+- **Tech surface (`/tech`)**: receive, store, deploy, transfer. Built for one hand on a phone in a cold dock bay. Keyboard-wedge scanners and phone cameras both work. Continuous-scan mode: the success banner stays visible while the input immediately re-arms for the next scan — no auto-dismiss timer, no waiting.
+- **Manager surface (`/manager`)**: paginated, filterable asset list with a drift topline, sortable column headers, sticky table header on scroll, drift dots on rows that need attention, removable filter chips, and filter state preserved through to the asset detail page.
 - **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff.
-- **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed).
+- **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed). Print stylesheet collapses the page chrome and forces one card per row.
 
 ## Quick start
 
@@ -32,19 +32,25 @@ cd starter && npx next dev -p 3000
 
 ## Three calls I nearly made the other way
 
-### 1. Where the facilities/finance write-back lives
+### 1. Continuous-scan mode instead of timed auto-reset
 
-The brief says it's the candidate's call: client, proxy, or a server route handler. I wired it into a thin server orchestrator at `app/api/scans/[type]/route.ts`. Each handler calls the upstream scan, then (for `deploy` and `store-from-in_service`) calls the facilities/finance mocks, and returns `{ asset, side_effects: [...] }` so the UI can show the tech *exactly* what wrote where.
+The first version of the success banner used a 4-second auto-dismiss timer: scan, see the green check, watch it fade, then start the next scan. It demoed beautifully and was wrong for the actual job.
 
-I almost put the writes inline on the client. The seductive case: simpler — fire the scan, then on success fire two more `fetch`es. But the orchestration buys three things:
+A tech who's just received an asset isn't sitting and watching the screen. They're already moving the next box onto the dock. By the time their attention comes back, the banner has either disappeared (so they can't tell whether the last scan landed) or it disappears mid-glance (so they squint and lose their place). The 4-second window is long enough to feel slow and short enough to feel anxious.
 
-- **One progress indicator, one error surface.** Three independent client calls means three independent loading states the tech has to interpret. A server route lets the success banner say "deploy + facilities + finance, all done" with one spinner.
-- **Server-resolved `user_id`.** The client never gets to forge a custodian; the cookie role is read in the route handler. That's a posture choice — the brief explicitly omits auth, but I'd rather build *as if* it were real.
-- **Side-effect transparency.** Because the route returns the per-system result, when the facilities mock 500s the tech sees "✓ scan, ✓ finance, ✗ facilities — flag this" rather than a green check that hides a half-finished operation.
+What shipped: the success banner stays put until either the next successful scan replaces it or the tech dismisses it explicitly. The scan input clears and re-focuses *immediately*, so the next scan can begin before the eye has even tracked back to the screen. `Esc` clears the in-progress form. On phones, `navigator.vibrate` gives a short double-pulse on success and a longer single buzz on error so the tech can tell what happened without looking. `aria-live="polite"` on the banner means screen readers announce the result without interrupting what the user is reading.
 
-The downside I accepted: the tech makes one extra hop. At ~1k assets and a local API it's invisible; if the API moved across a region this would become latency I'd want to optimize.
+I almost left the timer in because the timed version "feels modern." It's the visible-design vs. used-design tradeoff — what helps the demo isn't what helps the rhythm of a hundred-scan shift.
 
-### 2. Reconciliation as a *list of categories*, not a *list of diffs*
+### 2. Receive prefills from existing asset records
+
+The naive receive flow asks the tech to type serial, model, manufacturer, and class for *every* scan, fresh, even when the same tag has been received twenty times before. The API supports duplicate-receive idempotently — but only if the tech retypes the serial correctly. So duplicate-receive in practice becomes "tech mistypes the serial → API rejects with `and_match_failed` → tech curses → tech recovers."
+
+What shipped: when the scanned tag is already known, the form prefills serial / model / manufacturer / class from the existing record. The tech reads the form, glances at the unit in their hand, and either confirms (`and_match_failed` becomes impossible because we sent back what was on file) or *edits* a field — at which point the field turns amber with a small "edited" badge so the tech sees they're about to tell the system "this unit doesn't match what we had on file."
+
+The tradeoff: the receive form is now context-aware in a way the brief doesn't ask for, and the prefill costs an extra `GET /assets/:tag` round-trip on every scan. The round-trip is one local network hop and the prefill is the difference between a 30-second flow and a 5-second confirm — well worth it.
+
+### 3. Reconciliation as a *list of categories*, not a *list of diffs*
 
 The naive read of "build a reconciliation report" is: walk all three sources, emit a row for every disagreement, sort by tag. I built and threw away that version — it produced a 700-row table that a manager can't act on.
 
@@ -64,13 +70,10 @@ The other call I made here: I do *not* surface "explained-by-state" diffs by def
 
 The other version I considered: showing just the seven needs-action items as a flat priority list with no grouping. It's tidier but it scales worse — when a single botched migration produces 80 rack mismatches, a flat list reads as a fire when the action is one bulk fix.
 
-### 3. The `LocationFields` component lets the tech edit the location, not just scan one
+### Honorable mentions
 
-The minimal deploy flow is: scan asset, scan location barcode (which I encode as `LOC|site|room|row|rack|ru`), POST. Done. I implemented that and it works.
-
-But it's brittle. The dock bay won't always have a printed location label for every rack RU; sometimes the tech is correcting a bad scan; sometimes they need to fix the row but not the rack. I added an editable form *underneath* the scan input that pre-fills from the asset's last-known site (so an in-building move doesn't require typing the site again) and highlights required fields in amber. The scan is the fast path; the form is the recovery path.
-
-The cost: more screen real-estate, more visual complexity. The benefit: the tech never gets stranded staring at an error they can't resolve from the current screen. Given the "11pm in a cold dock bay" framing, I'd rather be slightly busier than slightly stuck.
+- **`LocationFields` lets the tech edit, not just scan.** The minimal deploy flow is scan-asset → scan-location → POST, and I shipped that as the fast path. But not every rack has a printed `LOC|…` label, and sometimes the tech is correcting a bad scan. The editable form underneath pre-fills from the asset's last-known site and highlights required fields in amber when empty. Cost: more pixels. Benefit: the tech never gets stranded.
+- **Where the facilities/finance write-back lives.** Server orchestrator at `app/api/scans/[type]/route.ts` so the success banner can show one progress state and a per-system side-effect strip ("✓ facilities · ✓ finance" or "✗ facilities — upstream offline"), with `user_id` server-resolved from the cookie. Almost did it client-side — three uncoordinated `fetch`es means three loading states the tech has to interpret.
 
 ## What I deliberately didn't build
 
@@ -79,7 +82,8 @@ The cost: more screen real-estate, more visual complexity. The benefit: the tech
 - **Search-as-you-type on the manager list.** Submitted-on-Enter / on-blur. At 1k rows debounced search would be fine; at 100k it would melt the API. The conservative choice is consistent at both scales.
 - **Pretty timestamps everywhere.** Manager surfaces use `relativeTime` for the scanning eye, with the full ISO timestamp on `title=` hover. Tech log uses raw seconds/minutes — the tech's frame of reference is "what just happened," not "what day was it."
 - **Dark mode.** Tailwind defaults are fine for this scope.
-- **A loading skeleton for the manager dashboard.** Server components render synchronously; the user sees a complete page or an empty state, not a flicker. If the upstream were slower I'd add one.
+- **A bulk "mark all resolved" affordance on the reconcile report.** No resolution endpoint upstream, and faking it would teach the manager the wrong mental model. The report regenerates from current state every open — that *is* the resolution mechanism.
+- **An offline scan queue.** Hard problem, low value at this prototype scope. Flagged at the bottom of `docs/CONTEXT.md` as something a real system would do; the design wouldn't need to change shape to layer it on (every scan goes through one client wrapper).
 
 ## Architecture notes
 
@@ -104,12 +108,13 @@ starter/
     client-scans.ts                  # browser → /api/scans/* wrappers
     format.ts                        # state/event labels, error guidance
 test/
-  reconcile.test.ts                  # 12 tests
-  locations.test.ts                  # 13 tests
+  reconcile.test.ts                  # 12 tests — classifier
+  scan-server.test.ts                # 7 tests — orchestration (writes for deploy, de-rack, no-write paths)
+  locations.test.ts                  # 13 tests — payload encoder/parser
   ScanInput.test.tsx                 # 3 tests (provided)
 ```
 
-The classifier and the location parser are pure functions with no Next/React dependencies. They get unit tests; the React components do not (the cost is high, the value is low at this code volume — taste, not theology).
+35 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
 
 ## Pushback on the brief
 
@@ -127,7 +132,11 @@ The empty state on `/manager/reconcile` when nothing is broken:
 
 I wrote a long version that explained what the report does ("This page shows...") and a terse version that said "All systems agree." The version I shipped does three things at once: it confirms the report ran (vs. failed silently), it sets the manager's expectation that this is unusual (so they don't think they broke it), and it gives them permission to close the tab. Most empty states pretend the absence of data is normal; this one names it as the rare case it actually is.
 
-Walking through the deploy success banner in the Loom is on my list too — the side-effect strip ("✓ facilities · ✓ finance") is what makes the write-back visible without making the tech parse a JSON response.
+The other piece I'd call out is the receive prefill banner. When the scanned tag is already on file, the form fills in and the tech sees:
+
+> **Tag already on file.** Fields prefilled from the existing record. If the unit in your hand matches, just hit submit and we'll log a duplicate. If the serial is different, edit it and we'll surface the conflict.
+
+Three sentences, three jobs: explain why the form looks pre-filled, tell them what the happy path does (one tap → log a duplicate → done), and tell them what the divergent path looks like (edit → see the conflict). The microcopy IS the documentation for the duplicate-receive flow; I never had to teach a tech how this works.
 
 ## Tech stack
 
@@ -135,7 +144,18 @@ Walking through the deploy success banner in the Loom is on my list too — the 
 - TypeScript, Tailwind 3
 - `@zxing/browser` for the camera scanner (lazy-imported so non-camera flows skip the bundle)
 - `bwip-js` for server-rendered Code 128 PNGs on the barcode page
-- Vitest for unit tests
+- Vitest for unit tests (35 passing)
+
+## Accessibility & polish
+
+- Skip-to-main-content link in the header for keyboard users
+- `aria-live="polite"` on the success banner so screen readers announce successful scans
+- `prefers-reduced-motion` honored — animations and transitions are disabled
+- All scan inputs respond to `Esc` (clear) and `Enter` (commit)
+- Focus management: after every successful scan, focus moves back to the next-step input automatically; `requestAnimationFrame` ensures the input is mounted before grabbing focus
+- 44×44 minimum tap targets on every interactive control
+- `loading.tsx` skeletons on the slower routes (manager dashboard, reconcile, asset detail) so navigation feels snappy
+- Print stylesheet on `/dev/barcodes` strips chrome and forces one barcode per page for clean output
 
 ## Notes from building this
 

@@ -17,6 +17,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-3 focus:py-2 focus:rounded"
+        >
+          Skip to main content
+        </a>
         <header className="border-b bg-white sticky top-0 z-30">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <a href="/" className="font-semibold text-gray-900 whitespace-nowrap">
@@ -26,7 +32,9 @@ export default function RootLayout({
             <RoleSwitcher />
           </div>
         </header>
-        <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
+        <main id="main" className="max-w-5xl mx-auto px-4 py-6">
+          {children}
+        </main>
       </body>
     </html>
   );

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ScanField } from "@/components/ScanField";
+import { useRef, useState } from "react";
+import { ScanField, type ScanFieldHandle } from "@/components/ScanField";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { ScanLog, type ScanLogEntry } from "@/components/ScanLog";
 import { LocationFields } from "@/components/LocationFields";
-import { clientScans } from "@/lib/client-scans";
+import { StateBadge } from "@/components/StateBadge";
+import { clientScans, fetchAsset } from "@/lib/client-scans";
 import { ApiError } from "@/lib/api-client";
 import { isAssetTag, emptyLocation } from "@/lib/locations";
+import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { AssetClass, Asset, Location } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
 
@@ -20,17 +22,20 @@ const CLASSES: AssetClass[] = [
   "consumable_durable",
 ];
 
-type Phase = "scan_tag" | "fill_intake" | "submitting";
+type Phase = "scan_tag" | "loading_asset" | "fill_intake" | "submitting";
 
 // Receive flow:
-//  1. Scan the asset tag.
-//  2. (For new tags) collect serial, model, manufacturer, class, intake
-//     location. The API decides whether this is a fresh receive, an
-//     idempotent duplicate, or a serial conflict — we just collect and POST.
-//  3. Submit. Show outcome with which serial conflicts (if any).
+//   1. Scan the asset tag.
+//   2. Look it up. If it's known, prefill serial/model/manufacturer/class
+//      from the existing record so the tech only confirms — re-typing every
+//      field on a duplicate scan is friction the tech will skip around.
+//   3. Tech confirms or edits, submits. The API decides whether to log a
+//      duplicate_receive (matching serial), reject (mismatching serial),
+//      or create (new tag).
 export default function TechReceivePage() {
   const [phase, setPhase] = useState<Phase>("scan_tag");
   const [tag, setTag] = useState<string>("");
+  const [knownAsset, setKnownAsset] = useState<Asset | null>(null);
   const [serial, setSerial] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [manufacturer, setManufacturer] = useState<string>("");
@@ -45,26 +50,26 @@ export default function TechReceivePage() {
     sideEffects: SideEffect[];
   } | null>(null);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
-  const successTimer = useRef<number | null>(null);
+  const scanRef = useRef<ScanFieldHandle>(null);
 
   function reset(): void {
     setPhase("scan_tag");
     setTag("");
+    setKnownAsset(null);
     setSerial("");
     setModel("");
     setManufacturer("");
     setAssetClass("instrument");
     setLocation(emptyLocation(location.site || "Lab-Building-A"));
     setError(null);
+    requestAnimationFrame(() => scanRef.current?.focus());
   }
 
-  useEffect(() => {
-    return () => {
-      if (successTimer.current) window.clearTimeout(successTimer.current);
-    };
-  }, []);
-
-  function flashSuccess(entry: { asset: Asset; message: string; sideEffects: SideEffect[] }) {
+  function recordSuccess(entry: {
+    asset: Asset;
+    message: string;
+    sideEffects: SideEffect[];
+  }): void {
     setSuccess(entry);
     setLog((l) => [
       {
@@ -76,26 +81,62 @@ export default function TechReceivePage() {
       },
       ...l,
     ]);
-    if (successTimer.current) window.clearTimeout(successTimer.current);
-    successTimer.current = window.setTimeout(() => {
-      setSuccess(null);
-      reset();
-    }, 4000);
+    tactileSuccess();
+    reset();
   }
 
-  function handleTagScan(value: string): void {
+  function recordError(err: unknown, asset_tag?: string): void {
+    setError(err);
+    tactileError();
+    setLog((l) => [
+      {
+        at: Date.now(),
+        outcome: "error",
+        asset_tag,
+        message: err instanceof Error ? err.message : "Receive failed",
+      },
+      ...l,
+    ]);
+  }
+
+  async function handleTagScan(value: string): Promise<void> {
     if (!isAssetTag(value)) {
-      setError(
-        new ApiError(400, "invalid_tag_format", `"${value}" doesn't look like a tag.`),
+      recordError(
+        new ApiError(
+          400,
+          "invalid_tag_format",
+          `"${value}" doesn't look like a tag.`,
+        ),
+        value,
       );
-      setLog((l) => [
-        { at: Date.now(), outcome: "error", message: `Bad tag scan: ${value}` },
-        ...l,
-      ]);
       return;
     }
     setError(null);
     setTag(value);
+    setPhase("loading_asset");
+
+    // Probe the upstream. If the tag is known, prefill from it; if it's
+    // unknown (404), the form starts empty and we go straight to intake.
+    try {
+      const existing = await fetchAsset(value);
+      setKnownAsset(existing);
+      setSerial(existing.serial);
+      setModel(existing.model);
+      setManufacturer(existing.manufacturer);
+      setAssetClass(existing.asset_class);
+      if (existing.location.site) {
+        setLocation((prev) => ({ ...prev, site: existing.location.site }));
+      }
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "unknown_asset") {
+        // Brand-new tag — that's the common path. Nothing to prefill.
+        setKnownAsset(null);
+      } else {
+        setPhase("scan_tag");
+        recordError(e, value);
+        return;
+      }
+    }
     setPhase("fill_intake");
   }
 
@@ -103,7 +144,11 @@ export default function TechReceivePage() {
     if (!tag) return;
     if (!serial || !model || !manufacturer) {
       setError(
-        new ApiError(400, "missing_fields", "Serial, model, and manufacturer are required."),
+        new ApiError(
+          400,
+          "missing_fields",
+          "Serial, model, and manufacturer are required.",
+        ),
       );
       return;
     }
@@ -122,23 +167,17 @@ export default function TechReceivePage() {
         asset_class: assetClass,
         location,
       });
-      flashSuccess({
+      const message = knownAsset
+        ? "Duplicate receive logged"
+        : "Receive recorded";
+      recordSuccess({
         asset: result.asset,
-        message: "Receive recorded",
+        message,
         sideEffects: result.side_effects,
       });
     } catch (e) {
-      setError(e);
       setPhase("fill_intake");
-      setLog((l) => [
-        {
-          at: Date.now(),
-          outcome: "error",
-          asset_tag: tag,
-          message: e instanceof Error ? e.message : "Receive failed",
-        },
-        ...l,
-      ]);
+      recordError(e, tag);
     }
   }
 
@@ -158,18 +197,43 @@ export default function TechReceivePage() {
           asset={success.asset}
           message={success.message}
           sideEffects={success.sideEffects}
+          onDismiss={() => setSuccess(null)}
         />
       ) : null}
 
-      {phase === "scan_tag" ? (
+      {phase === "scan_tag" || phase === "loading_asset" ? (
         <ScanField
+          ref={scanRef}
           label="Scan the asset tag"
           placeholder="C0009001"
-          hint="Code 128 or QR. Or type 7 digits and press Enter."
+          hint="Code 128 or QR. Esc clears. Continuous-scan: each commit re-arms the input."
+          disabled={phase === "loading_asset"}
           onScan={handleTagScan}
+          onEscape={reset}
         />
       ) : (
         <div className="space-y-4">
+          {knownAsset ? (
+            <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs text-blue-900 font-semibold uppercase tracking-wide">
+                  Tag already on file
+                </div>
+                <div className="text-sm text-blue-900 mt-1">
+                  Fields prefilled from the existing record. If the unit in
+                  your hand matches, just hit submit and we&rsquo;ll log a
+                  duplicate. If the serial is different, edit it and we&rsquo;ll
+                  surface the conflict.
+                </div>
+              </div>
+              <StateBadge state={knownAsset.state} />
+            </div>
+          ) : (
+            <div className="bg-gray-100 rounded-lg p-3 text-xs text-gray-600">
+              Brand-new tag. Fill in the intake details.
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 bg-gray-100 rounded-lg p-3">
             <div>
               <div className="text-xs text-gray-500">Receiving</div>
@@ -179,7 +243,7 @@ export default function TechReceivePage() {
               onClick={reset}
               className="text-sm text-gray-600 hover:text-gray-900 underline"
             >
-              Different tag
+              Different tag (Esc)
             </button>
           </div>
 
@@ -190,6 +254,7 @@ export default function TechReceivePage() {
               value={serial}
               onChange={setSerial}
               placeholder="SN-…"
+              changedFromKnown={knownAsset ? serial !== knownAsset.serial : false}
             />
             <Field
               label="Model"
@@ -197,6 +262,7 @@ export default function TechReceivePage() {
               value={model}
               onChange={setModel}
               placeholder="Genomics Sequencer 2000"
+              changedFromKnown={knownAsset ? model !== knownAsset.model : false}
             />
             <Field
               label="Manufacturer"
@@ -204,6 +270,9 @@ export default function TechReceivePage() {
               value={manufacturer}
               onChange={setManufacturer}
               placeholder="BioSystems Inc"
+              changedFromKnown={
+                knownAsset ? manufacturer !== knownAsset.manufacturer : false
+              }
             />
             <label className="block">
               <span className="block text-xs font-medium text-gray-700 mb-1">
@@ -239,7 +308,11 @@ export default function TechReceivePage() {
             disabled={phase === "submitting"}
             className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg min-h-[44px]"
           >
-            {phase === "submitting" ? "Receiving…" : "Record receive"}
+            {phase === "submitting"
+              ? "Receiving…"
+              : knownAsset
+                ? "Confirm duplicate"
+                : "Record receive"}
           </button>
         </div>
       )}
@@ -257,24 +330,35 @@ function Field({
   onChange,
   placeholder,
   required,
+  changedFromKnown,
 }: {
   label: string;
   value: string;
   onChange: (s: string) => void;
   placeholder?: string;
   required?: boolean;
+  // Visual cue when the tech edits a prefilled value — they likely just told
+  // the system "the unit in my hand differs from what we had on file."
+  changedFromKnown?: boolean;
 }) {
   return (
     <label className="block">
       <span className="block text-xs font-medium text-gray-700 mb-1">
         {label} {required ? <span className="text-red-600">*</span> : null}
+        {changedFromKnown ? (
+          <span className="ml-2 text-amber-700 font-normal">edited</span>
+        ) : null}
       </span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 min-h-[44px] rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className={`w-full px-3 py-2 min-h-[44px] rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+          changedFromKnown
+            ? "border-amber-400 bg-amber-50"
+            : "border-gray-300"
+        }`}
         autoComplete="off"
         spellCheck={false}
       />

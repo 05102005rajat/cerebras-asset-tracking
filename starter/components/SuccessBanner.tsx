@@ -2,22 +2,27 @@ import type { Asset } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
 import { StateBadge } from "./StateBadge";
 
-// Big confirmation block. Shown for ~4s after a successful scan, then auto-
-// fades. We keep the asset summary and side-effect log visible so the tech
-// can verify the write went where they expected.
+// Persistent confirmation block. Doesn't auto-dismiss — the next successful
+// scan replaces it, the dismiss button hides it, but a tech mid-rhythm never
+// has to chase it. aria-live=polite so screen readers announce the result
+// without interrupting whatever else they're reading.
 export function SuccessBanner({
   asset,
   message,
   sideEffects,
+  onDismiss,
 }: {
   asset: Asset;
   message: string;
   sideEffects: SideEffect[];
+  onDismiss?: () => void;
 }) {
   const anyFailed = sideEffects.some((s) => !s.ok);
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`border rounded-lg p-4 ${
         anyFailed
           ? "border-amber-300 bg-amber-50"
@@ -31,13 +36,23 @@ export function SuccessBanner({
         >
           {anyFailed ? "⚠" : "✓"}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="font-semibold text-gray-900">{message}</div>
-          <div className="text-sm text-gray-600 mt-0.5">
+          <div className="text-sm text-gray-600 mt-0.5 truncate">
             <span className="font-mono">{asset.asset_tag}</span> · {asset.model}
           </div>
         </div>
         <StateBadge state={asset.state} />
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss success banner"
+            className="text-gray-500 hover:text-gray-900 text-lg leading-none px-1"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
       {sideEffects.length > 0 ? (
         <ul className="mt-3 text-xs space-y-1">

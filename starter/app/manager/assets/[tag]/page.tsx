@@ -13,10 +13,16 @@ export const dynamic = "force-dynamic";
 
 export default async function ManagerAssetDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tag: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { tag } = await params;
+  const sp = await searchParams;
+  const fromRaw = sp.from;
+  const from = Array.isArray(fromRaw) ? fromRaw[0] : fromRaw;
+  const backHref = from ? `/manager?${from}` : "/manager";
 
   let asset: Asset | null = null;
   let events: Event[] = [];
@@ -39,7 +45,7 @@ export default async function ManagerAssetDetailPage({
   if (!asset) {
     return (
       <div className="space-y-4">
-        <BackLink />
+        <BackLink href={backHref} />
         <EmptyState
           title={lookupError ?? "Asset not found"}
           body={
@@ -67,7 +73,7 @@ export default async function ManagerAssetDetailPage({
 
   return (
     <div className="space-y-6">
-      <BackLink />
+      <BackLink href={backHref} />
 
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -211,13 +217,14 @@ export default async function ManagerAssetDetailPage({
   );
 }
 
-function BackLink() {
+function BackLink({ href }: { href: string }) {
+  const usingFilters = href !== "/manager";
   return (
     <Link
-      href="/manager"
+      href={href}
       className="inline-flex items-center gap-1 text-sm text-blue-700 hover:underline"
     >
-      ← Back to assets
+      ← {usingFilters ? "Back to filtered results" : "Back to assets"}
     </Link>
   );
 }

@@ -1,11 +1,12 @@
 import { api } from "@/lib/api-client";
-import { reconcile } from "@/lib/reconcile";
+import { reconcile, type Severity } from "@/lib/reconcile";
 import { AssetTable } from "@/components/AssetTable";
 import { AssetFilters } from "@/components/AssetFilters";
+import { FilterChips } from "@/components/FilterChips";
 import { Pagination } from "@/components/Pagination";
 import { DriftTopline } from "@/components/DriftTopline";
 import { EmptyState } from "@/components/EmptyState";
-import type { AssetState } from "@/lib/types";
+import type { Asset, AssetState } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 
@@ -32,38 +33,38 @@ export default async function ManagerLandingPage({
   const q = (readOne(sp.q) ?? "").toLowerCase();
   const page = Math.max(1, parseInt(readOne(sp.page) ?? "1", 10) || 1);
 
-  // We always pull the full list and reconcile once per page render.
-  // At 1k assets this is comfortably sub-second; at 100k we'd push the
-  // server-side filter and the reconcile to background jobs.
-  const [assets, facilities, finance] = await Promise.all([
-    api.assets.list({
-      state: state && VALID_STATES.includes(state as AssetState) ? state : undefined,
-      site: site || undefined,
-      custodian: custodian || undefined,
-    }),
+  // The reconciliation walks every asset, so we need the unfiltered set; the
+  // table walks only the filtered slice. One round-trip for each — we used
+  // to fire the unfiltered list twice (once for reconcile, once to populate
+  // filter dropdowns), folded into one.
+  const [allAssets, facilities, finance] = await Promise.all([
+    api.assets.list({}),
     api.mock.facilities(),
     api.mock.finance(),
   ]);
 
-  const filtered = q
-    ? assets.filter((a) =>
-        [a.asset_tag, a.model, a.manufacturer, a.serial]
-          .join(" ")
-          .toLowerCase()
-          .includes(q),
-      )
-    : assets;
-
+  const filtered = applyFilters(allAssets, { state, site, custodian, q });
   const total = filtered.length;
   const start = (page - 1) * PAGE_SIZE;
   const slice = filtered.slice(start, start + PAGE_SIZE);
 
-  const report = reconcile(assets, facilities, finance);
+  const report = reconcile(allAssets, facilities, finance);
 
-  // Used to populate filter dropdowns. We pull from the unfiltered set so
-  // that selecting "Site B" doesn't make the Site dropdown show only B.
-  // (Tradeoff: if a site has zero assets right now, it still appears.)
-  const allAssets = await api.assets.list({});
+  // Map of asset_tag → most-severe issue, so the table can dot the row.
+  const driftMap = new Map<string, Severity>();
+  for (const issue of report.issues) {
+    if (!issue.asset_tag) continue;
+    const existing = driftMap.get(issue.asset_tag);
+    if (
+      !existing ||
+      severityRank(issue.severity) > severityRank(existing)
+    ) {
+      driftMap.set(issue.asset_tag, issue.severity);
+    }
+  }
+
+  // Pull dropdown options from the unfiltered set so that selecting "Site B"
+  // doesn't make the Site dropdown show only B.
   const knownSites = Array.from(
     new Set(allAssets.map((a) => a.location.site).filter(Boolean)),
   ).sort();
@@ -71,13 +72,17 @@ export default async function ManagerLandingPage({
     new Set(allAssets.map((a) => a.custodian).filter(Boolean)),
   ).sort();
 
+  // Pass the active query string to the table so each link can preserve it
+  // — clicking back from the detail page returns to this exact filter set.
+  const preserveSearch = await searchParamsToString(sp);
+
   return (
     <div className="space-y-5">
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold">Assets</h1>
           <p className="text-sm text-gray-600 mt-1">
-            {assets.length.toLocaleString()} assets across{" "}
+            {allAssets.length.toLocaleString()} assets across{" "}
             {knownSites.length} site{knownSites.length === 1 ? "" : "s"}.
           </p>
         </div>
@@ -94,6 +99,8 @@ export default async function ManagerLandingPage({
         knownCustodians={knownCustodians}
       />
 
+      <FilterChips />
+
       {slice.length === 0 ? (
         <EmptyState
           title="Nothing matches these filters"
@@ -101,7 +108,11 @@ export default async function ManagerLandingPage({
         />
       ) : (
         <>
-          <AssetTable assets={slice} />
+          <AssetTable
+            assets={slice}
+            driftMap={driftMap}
+            preserveSearch={preserveSearch}
+          />
           <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
         </>
       )}
@@ -109,7 +120,47 @@ export default async function ManagerLandingPage({
   );
 }
 
+function applyFilters(
+  assets: Asset[],
+  f: { state?: string; site?: string; custodian?: string; q: string },
+): Asset[] {
+  return assets.filter((a) => {
+    if (f.state && VALID_STATES.includes(f.state as AssetState) && a.state !== f.state)
+      return false;
+    if (f.site && a.location.site !== f.site) return false;
+    if (f.custodian && a.custodian !== f.custodian) return false;
+    if (
+      f.q &&
+      ![a.asset_tag, a.model, a.manufacturer, a.serial]
+        .join(" ")
+        .toLowerCase()
+        .includes(f.q)
+    )
+      return false;
+    return true;
+  });
+}
+
+function severityRank(s: Severity): number {
+  return s === "needs_action" ? 2 : s === "watch" ? 1 : 0;
+}
+
 function readOne(v: string | string[] | undefined): string | undefined {
   if (Array.isArray(v)) return v[0];
   return v;
+}
+
+async function searchParamsToString(
+  sp: Record<string, string | string[] | undefined>,
+): Promise<string> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (v == null) continue;
+    if (Array.isArray(v)) {
+      for (const item of v) qs.append(k, item);
+    } else {
+      qs.set(k, v);
+    }
+  }
+  return qs.toString();
 }

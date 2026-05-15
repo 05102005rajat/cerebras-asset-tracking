@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ScanField } from "@/components/ScanField";
+import { useRef, useState } from "react";
+import { ScanField, type ScanFieldHandle } from "@/components/ScanField";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { ScanLog, type ScanLogEntry } from "@/components/ScanLog";
@@ -13,7 +13,9 @@ import {
   isAssetTag,
   emptyLocation,
   isCompleteDeployLocation,
+  formatLocation,
 } from "@/lib/locations";
+import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { Asset, Location } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
 
@@ -32,26 +34,21 @@ export default function TechDeployPage() {
     sideEffects: SideEffect[];
   } | null>(null);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
-  const successTimer = useRef<number | null>(null);
+  const scanRef = useRef<ScanFieldHandle>(null);
 
   function reset(): void {
     setPhase("scan_tag");
     setAsset(null);
     setLocation(emptyLocation(location.site || "Lab-Building-A"));
     setError(null);
+    requestAnimationFrame(() => scanRef.current?.focus());
   }
 
-  useEffect(() => {
-    return () => {
-      if (successTimer.current) window.clearTimeout(successTimer.current);
-    };
-  }, []);
-
-  function flashSuccess(entry: {
+  function recordSuccess(entry: {
     asset: Asset;
     message: string;
     sideEffects: SideEffect[];
-  }) {
+  }): void {
     setSuccess(entry);
     setLog((l) => [
       {
@@ -63,17 +60,29 @@ export default function TechDeployPage() {
       },
       ...l,
     ]);
-    if (successTimer.current) window.clearTimeout(successTimer.current);
-    successTimer.current = window.setTimeout(() => {
-      setSuccess(null);
-      reset();
-    }, 4000);
+    tactileSuccess();
+    reset();
+  }
+
+  function recordError(err: unknown, asset_tag?: string): void {
+    setError(err);
+    tactileError();
+    setLog((l) => [
+      {
+        at: Date.now(),
+        outcome: "error",
+        asset_tag,
+        message: err instanceof Error ? err.message : "Scan failed",
+      },
+      ...l,
+    ]);
   }
 
   async function handleTagScan(value: string): Promise<void> {
     if (!isAssetTag(value)) {
-      setError(
+      recordError(
         new ApiError(400, "invalid_tag_format", `"${value}" isn't a tag.`),
+        value,
       );
       return;
     }
@@ -87,17 +96,8 @@ export default function TechDeployPage() {
         setLocation((prev) => ({ ...prev, site: a.location.site }));
       }
     } catch (e) {
-      setError(e);
       setPhase("scan_tag");
-      setLog((l) => [
-        {
-          at: Date.now(),
-          outcome: "error",
-          asset_tag: value,
-          message: e instanceof Error ? e.message : "Lookup failed",
-        },
-        ...l,
-      ]);
+      recordError(e, value);
     }
   }
 
@@ -120,25 +120,18 @@ export default function TechDeployPage() {
         asset_tag: asset.asset_tag,
         location,
       });
-      flashSuccess({
+      recordSuccess({
         asset: result.asset,
-        message: "Deployed — racked & in service",
+        message: `Deployed → ${formatLocation(location)}`,
         sideEffects: result.side_effects,
       });
     } catch (e) {
-      setError(e);
       setPhase("scan_location");
-      setLog((l) => [
-        {
-          at: Date.now(),
-          outcome: "error",
-          asset_tag: asset.asset_tag,
-          message: e instanceof Error ? e.message : "Deploy failed",
-        },
-        ...l,
-      ]);
+      recordError(e, asset.asset_tag);
     }
   }
+
+  const ready = isCompleteDeployLocation(location);
 
   return (
     <div className="space-y-5">
@@ -155,15 +148,19 @@ export default function TechDeployPage() {
           asset={success.asset}
           message={success.message}
           sideEffects={success.sideEffects}
+          onDismiss={() => setSuccess(null)}
         />
       ) : null}
 
       {phase === "scan_tag" || phase === "loading_asset" ? (
         <ScanField
+          ref={scanRef}
           label="Scan the asset"
           placeholder="C0009001"
+          hint="Esc clears. Continuous-scan: each successful deploy re-arms the input."
           disabled={phase === "loading_asset"}
           onScan={handleTagScan}
+          onEscape={reset}
         />
       ) : null}
 
@@ -179,17 +176,21 @@ export default function TechDeployPage() {
               onChange={setLocation}
               requiredFields={["site", "room", "rack", "ru"]}
             />
-            <p className="text-xs text-gray-500 mt-2">
-              Row is optional. Site, room, rack, and RU are all required for
-              deploy.
-            </p>
+            <div className="text-xs mt-2 flex items-center justify-between gap-2">
+              <span className="text-gray-500">
+                Row is optional. Site, room, rack, and RU are all required.
+              </span>
+              {ready ? (
+                <span className="text-emerald-700 font-mono truncate">
+                  → {formatLocation(location)}
+                </span>
+              ) : null}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={handleSubmit}
-              disabled={
-                phase === "submitting" || !isCompleteDeployLocation(location)
-              }
+              disabled={phase === "submitting" || !ready}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg min-h-[44px]"
             >
               {phase === "submitting" ? "Deploying…" : "Record deploy"}
@@ -198,7 +199,7 @@ export default function TechDeployPage() {
               onClick={reset}
               className="text-sm text-gray-600 hover:text-gray-900 underline"
             >
-              Different asset
+              Different asset (Esc)
             </button>
           </div>
         </>

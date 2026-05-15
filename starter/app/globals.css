@@ -10,3 +10,43 @@ body {
 body {
   @apply bg-gray-50 text-gray-900 antialiased;
 }
+
+/* Honor user motion preference. The header sticky, the sticky table header,
+   and the active:scale animation on tech tiles all become instant. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Print stylesheet — really only meaningful on /dev/barcodes, but keeping it
+   global means /manager/reconcile prints reasonably for offline review too. */
+@media print {
+  body {
+    background: white !important;
+  }
+  /* Hide chrome that wastes ink on the page. */
+  header.sticky,
+  .print\:hidden,
+  nav {
+    display: none !important;
+  }
+  /* Cards lose their drop-shadow / hover background to print clean. */
+  a {
+    color: black !important;
+    text-decoration: none !important;
+  }
+  /* Force one-card-per-row on printed barcode sheet so the strips are big. */
+  .grid {
+    display: block !important;
+  }
+  .grid > * {
+    page-break-inside: avoid;
+    margin-bottom: 12mm;
+  }
+  /* `break-before-page` is ours; map to print equivalent. */
+  .break-before-page {
+    page-break-before: always;
+  }
+}
