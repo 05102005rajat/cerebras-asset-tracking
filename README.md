@@ -6,7 +6,7 @@ A multi-site research lab tracks instruments across three systems that disagree 
 
 - **Tech surface (`/tech`)**: receive, store, deploy, transfer. Built for one hand on a phone in a cold dock bay. Keyboard-wedge scanners and phone cameras both work. Continuous-scan mode: the success banner stays visible while the input immediately re-arms for the next scan — no auto-dismiss timer, no waiting.
 - **Manager surface (`/manager`)**: paginated, filterable asset list with a drift topline, sortable column headers, sticky table header on scroll, drift dots on rows that need attention, removable filter chips, and filter state preserved through to the asset detail page.
-- **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff.
+- **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff. Ghost issues link directly to `/tech/receive?tag=…` because the action is to receive the asset for the first time. **Export CSV** so the manager can pipe the list into whatever tool their procurement team actually uses.
 - **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed). Print stylesheet collapses the page chrome and forces one card per row.
 
 ## Quick start
@@ -115,10 +115,12 @@ test/
   reconcile.test.ts                  # 16 tests — classifier (incl. missing_in_finance, format normalization)
   scan-server.test.ts                # 7 tests — orchestration (writes for deploy, de-rack, no-write paths)
   locations.test.ts                  # 15 tests — payload encoder/parser + rack normalizer
+  tag-validate.test.ts               # 5 tests — context-aware scan rejection (LOC|/BADGE|/garbage)
+  csv.test.ts                        # 4 tests — RFC-4180 reconcile export
   ScanInput.test.tsx                 # 3 tests (provided)
 ```
 
-41 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
+50 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
 
 ## Pushback on the brief
 

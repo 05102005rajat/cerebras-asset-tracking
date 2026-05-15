@@ -56,7 +56,16 @@ export default async function ManagerReconcilePage() {
             open this page from <code>/api/reconcile</code>.
           </p>
         </div>
-        <ReportMeta report={report} />
+        <div className="flex items-end gap-3 print:hidden">
+          <a
+            href="/api/reconcile/csv"
+            className="text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md font-medium"
+            download
+          >
+            Export CSV
+          </a>
+          <ReportMeta report={report} />
+        </div>
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -219,12 +228,28 @@ function IssueSection({
                       ) : null}
                     </div>
                     {issue.asset_tag ? (
-                      <Link
-                        href={`/manager/assets/${issue.asset_tag}`}
-                        className="font-mono text-xs text-blue-700 hover:underline whitespace-nowrap"
-                      >
-                        {issue.asset_tag} →
-                      </Link>
+                      <div className="flex flex-col items-end gap-1 whitespace-nowrap">
+                        {/* Ghost issues link to /tech/receive with the tag
+                             prefilled — the action the manager wants is for
+                             a tech to receive it for the first time. Other
+                             issues link to the asset detail for triage. */}
+                        {issue.category === "ghost_in_facilities" ||
+                        issue.category === "ghost_in_finance" ? (
+                          <Link
+                            href={`/tech/receive?tag=${issue.asset_tag}`}
+                            className="font-mono text-xs text-emerald-700 hover:underline"
+                          >
+                            Resolve via Receive →
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/manager/assets/${issue.asset_tag}`}
+                            className="font-mono text-xs text-blue-700 hover:underline"
+                          >
+                            {issue.asset_tag} →
+                          </Link>
+                        )}
+                      </div>
                     ) : null}
                   </div>
                 </li>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ScanField, type ScanFieldHandle } from "@/components/ScanField";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SuccessBanner } from "@/components/SuccessBanner";
@@ -25,6 +26,17 @@ const CLASSES: AssetClass[] = [
 
 type Phase = "scan_tag" | "loading_asset" | "fill_intake" | "submitting";
 
+// Suspense wrapper is required by Next 15's static prerender — useSearchParams
+// triggers a CSR bailout that needs a boundary. The inner page is where the
+// real logic lives.
+export default function TechReceivePage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-500">Loading…</div>}>
+      <ReceiveInner />
+    </Suspense>
+  );
+}
+
 // Receive flow:
 //   1. Scan the asset tag.
 //   2. Look it up. If it's known, prefill serial/model/manufacturer/class
@@ -33,7 +45,7 @@ type Phase = "scan_tag" | "loading_asset" | "fill_intake" | "submitting";
 //   3. Tech confirms or edits, submits. The API decides whether to log a
 //      duplicate_receive (matching serial), reject (mismatching serial),
 //      or create (new tag).
-export default function TechReceivePage() {
+function ReceiveInner() {
   const [phase, setPhase] = useState<Phase>("scan_tag");
   const [tag, setTag] = useState<string>("");
   const [knownAsset, setKnownAsset] = useState<Asset | null>(null);
@@ -52,6 +64,18 @@ export default function TechReceivePage() {
   } | null>(null);
   const [log, setLog] = useState<ScanLogEntry[]>([]);
   const scanRef = useRef<ScanFieldHandle>(null);
+
+  // Deep-link entry: /tech/receive?tag=C0000199 lands the tech right on the
+  // intake form (after a one-time lookup) — the reconcile page sends ghosts
+  // here so the manager's "resolve" click skips the scan step.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const fromUrl = searchParams.get("tag");
+    if (fromUrl && phase === "scan_tag") {
+      handleTagScan(fromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function reset(): void {
     setPhase("scan_tag");
