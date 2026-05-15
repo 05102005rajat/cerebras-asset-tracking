@@ -8,6 +8,7 @@ import {
   isCompleteDeployLocation,
   formatLocation,
   locationToFacilitiesString,
+  normalizeRackPath,
 } from "@/lib/locations";
 
 describe("location payloads", () => {
@@ -122,9 +123,10 @@ describe("display formatters", () => {
     ).toBe("A");
   });
 
-  it("matches the facilities slash format including null gaps", () => {
-    // Facilities uses "site/room/row/rack/ru". When row is null we still need
-    // the slot, otherwise the comparison against facilities would never align.
+  it("matches the seed's facilities slash format (drops null slots)", () => {
+    // The seed (procedural.ts) joins location parts with .filter(Boolean).
+    // Our writer adopts the same convention so freshly-written rows are
+    // string-identical to seed rows.
     expect(
       locationToFacilitiesString({
         site: "Lab-Building-A",
@@ -133,6 +135,27 @@ describe("display formatters", () => {
         rack: "B-04",
         ru: "P-02",
       }),
-    ).toBe("Lab-Building-A/Bay-12//B-04/P-02");
+    ).toBe("Lab-Building-A/Bay-12/B-04/P-02");
+
+    expect(
+      locationToFacilitiesString({
+        site: "Lab-Building-A",
+        room: "Bay-12",
+        row: "Aisle-3",
+        rack: "B-04",
+        ru: "P-02",
+      }),
+    ).toBe("Lab-Building-A/Bay-12/Aisle-3/B-04/P-02");
+  });
+});
+
+describe("normalizeRackPath", () => {
+  it("treats empty-slot and filtered formats as equivalent", () => {
+    expect(normalizeRackPath("A/Bay-9//R-9/P-01")).toBe("A/Bay-9/R-9/P-01");
+    expect(normalizeRackPath("A/Bay-9/R-9/P-01")).toBe("A/Bay-9/R-9/P-01");
+  });
+
+  it("strips leading and trailing empty segments too", () => {
+    expect(normalizeRackPath("/A/Bay-9/")).toBe("A/Bay-9");
   });
 });

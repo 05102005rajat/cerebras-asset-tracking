@@ -1,4 +1,4 @@
-import { locationToFacilitiesString } from "./locations";
+import { locationToFacilitiesString, normalizeRackPath } from "./locations";
 import type {
   Asset,
   FacilitiesRecord,
@@ -21,6 +21,7 @@ export type IssueCategory =
   // needs_action
   | "rack_mismatch"
   | "missing_in_facilities"
+  | "missing_in_finance"
   | "site_mismatch"
   | "ghost_in_facilities"
   | "ghost_in_finance"
@@ -28,6 +29,7 @@ export type IssueCategory =
   // watch
   | "stale_facilities_observation"
   | "finance_pending_after_receive"
+  | "early_lifecycle_no_finance"
   // info / explained-by-state (we don't usually surface these but include for transparency)
   | "stored_not_in_facilities"
   | "rma_not_in_facilities"
@@ -88,7 +90,10 @@ export function reconcile(
         });
       } else {
         const opsRack = locationToFacilitiesString(asset.location);
-        if (opsRack !== fac.rack_location) {
+        // Compare structurally: split on '/', drop empty segments. This way
+        // `A/Bay-9//R-9/P-01` (legacy empty-slot writes) and `A/Bay-9/R-9/P-01`
+        // (current filter-null writes) compare equal.
+        if (normalizeRackPath(opsRack) !== normalizeRackPath(fac.rack_location)) {
           issues.push({
             asset_tag: asset.asset_tag,
             severity: "needs_action",
@@ -141,7 +146,46 @@ export function reconcile(
     }
 
     // === Finance checks ===
-    if (fin) {
+    if (!fin) {
+      // Asset exists in ops but finance has no row at all. Severity depends on
+      // state: a received-but-not-yet-billed asset is normal billing-cycle lag
+      // (watch); an in_service or disposed asset finance doesn't know about is
+      // a real problem (you operated or disposed something off the books).
+      if (asset.state === "in_service" || asset.state === "disposed") {
+        issues.push({
+          asset_tag: asset.asset_tag,
+          severity: "needs_action",
+          category: "missing_in_finance",
+          headline:
+            asset.state === "disposed"
+              ? "Disposed but never on the books"
+              : "In service but never on the books",
+          detail: `Ops has ${asset.asset_tag} (${asset.model}) as ${asset.state.replace("_", " ")}, but finance carries no record. Procurement may have skipped a step, or the receive scan happened without a matching PO.`,
+          comparison: {
+            label: "finance status",
+            ops: asset.state,
+            finance: "—",
+          },
+        });
+      } else if (
+        asset.state === "received" ||
+        asset.state === "stored" ||
+        asset.state === "rma_pending"
+      ) {
+        issues.push({
+          asset_tag: asset.asset_tag,
+          severity: "watch",
+          category: "early_lifecycle_no_finance",
+          headline: "No finance record yet",
+          detail: `${asset.asset_tag} is ${asset.state.replace("_", " ")} in ops but finance hasn't written a row. Likely a PO that hasn't reached the books yet — chase it after the next billing cycle.`,
+          comparison: {
+            label: "finance status",
+            ops: asset.state,
+            finance: "—",
+          },
+        });
+      }
+    } else {
       // disposed in ops should not be `capitalized` in finance
       if (asset.state === "disposed" && fin.status === "capitalized") {
         issues.push({
@@ -258,12 +302,14 @@ function daysBetween(a: Date, b: Date): number {
 export const CATEGORY_LABEL: Record<IssueCategory, string> = {
   rack_mismatch: "Rack mismatch",
   missing_in_facilities: "Missing from facilities",
+  missing_in_finance: "Missing from finance",
   site_mismatch: "Site mismatch",
   ghost_in_facilities: "Ghost in facilities",
   ghost_in_finance: "Ghost in finance",
   disposed_but_capitalized: "Disposed but capitalized",
   stale_facilities_observation: "Stale observation",
   finance_pending_after_receive: "Finance lagging",
+  early_lifecycle_no_finance: "Awaiting finance",
   stored_not_in_facilities: "Stored — facilities-blind",
   rma_not_in_facilities: "RMA — facilities-blind",
   disposed_not_in_facilities: "Disposed — facilities-blind",

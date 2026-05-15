@@ -54,17 +54,21 @@ The tradeoff: the receive form is now context-aware in a way the brief doesn't a
 
 The naive read of "build a reconciliation report" is: walk all three sources, emit a row for every disagreement, sort by tag. I built and threw away that version — it produced a 700-row table that a manager can't act on.
 
-The version I shipped classifies into three severities and seven categories, with the category names tuned to the action the manager would take:
+The version I shipped classifies into three severities and nine categories, with the category names tuned to the action the manager would take:
 
 | Category | What it actually means |
 |---|---|
 | Rack mismatch | Someone moved the unit without scanning. Walk the row, find it, scan it. |
 | Missing in facilities | Deploy never wrote OR facilities lost the row. Re-deploy. |
+| Missing in finance (in_service / disposed) | We're operating or disposed something finance never billed. Chase procurement. |
 | Disposed but capitalized | Finance still has it on the books. Send finance the retire-out. |
 | Site mismatch | Finance bills the wrong building. Email finance, link the asset. |
 | Ghost in facilities/finance | Tag known to one downstream system but not ops. Either un-received or bad data. |
 | Stale facilities observation | More than 30 days since last walk. Audit during the next sweep. |
 | Finance pending after receive | Billing-cycle lag. Becomes "Needs action" if it persists past two weeks. |
+| Awaiting finance (received / stored / rma_pending) | Likely a PO not yet on the books. Check after next billing cycle. |
+
+Verified against the seed: the report catches **all 8 deliberately-planted drift cases** in `api/src/seed/` — the three rack mismatches, the disposed-but-capitalized row, both ghosts, the stale observation, and the seeded `C0000107` (received in ops, never written to finance). I caught the C0000107 case late in development — initial implementation only checked finance fields when a finance row existed, which silently passed seeded drift. Reading the seed file directly is how I noticed.
 
 The other call I made here: I do *not* surface "explained-by-state" diffs by default. An asset in storage *should* be absent from facilities — that's not drift, that's the schema. Surfacing it as an issue would teach the manager to ignore the report. The manager sees the count under "Info" so they know the system thought about it; the rows themselves stay collapsed.
 
@@ -108,13 +112,13 @@ starter/
     client-scans.ts                  # browser → /api/scans/* wrappers
     format.ts                        # state/event labels, error guidance
 test/
-  reconcile.test.ts                  # 12 tests — classifier
+  reconcile.test.ts                  # 16 tests — classifier (incl. missing_in_finance, format normalization)
   scan-server.test.ts                # 7 tests — orchestration (writes for deploy, de-rack, no-write paths)
-  locations.test.ts                  # 13 tests — payload encoder/parser
+  locations.test.ts                  # 15 tests — payload encoder/parser + rack normalizer
   ScanInput.test.tsx                 # 3 tests (provided)
 ```
 
-35 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
+41 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
 
 ## Pushback on the brief
 
@@ -122,7 +126,8 @@ A few small things flagged in good faith:
 
 1. **`tips.md` says "doing it in the browser ships the token; doing it in your scan API route doesn't."** That's not quite right as written — the provided proxy at `/api/upstream/*` already attaches the token server-side, so a browser `fetch('/api/upstream/...')` doesn't ship the token either. The real argument for moving the orchestration server-side is atomicity / single error surface / server-resolved identity, not token leakage. I went server-side anyway, but for those reasons.
 2. **`api-reference.md` lists the receive error code as `and_match_failed`.** I've kept the spelling because that's what the API actually returns (`{"error":{"code":"and_match_failed",...}}`), but my best guess is this was intended to be `serial_match_failed`. The string `and_match_failed` doesn't carry meaning. Worth renaming or aliasing on the API side.
-3. **The brief says "no auth"** but the seeded data uses `tech-jane` / `tech-mike` / `manager-paul` etc. as `user_id` and the role switcher mints them from a cookie. That's fine for a take-home, but flagged as a posture decision: I treated `user_id` as something the *server* sets (from the cookie) rather than something the client passes, so the design wouldn't need to change shape if you bolted real SSO on.
+3. **The seed has two different conventions for serializing rack locations.** `api/src/seed/procedural.ts` joins location parts with `.filter(Boolean)` (drops null slots), while a candidate following the `Location` type literally would write `Site/Room//Rack/RU` for a row-less rack. Either format works against the mock (it just stores the string), but mixed conventions in the same dataset mean a naive string-compare reconcile would flag false drift. My reconcile normalizes both sides via `normalizeRackPath` before comparing; my writer matches the seed convention. Worth either canonicalizing on the mock-write side or documenting the expected format in the brief.
+4. **The brief says "no auth"** but the seeded data uses `tech-jane` / `tech-mike` / `manager-paul` etc. as `user_id` and the role switcher mints them from a cookie. That's fine for a take-home, but flagged as a posture decision: I treated `user_id` as something the *server* sets (from the cookie) rather than something the client passes, so the design wouldn't need to change shape if you bolted real SSO on.
 
 ## A piece of microcopy I'm proud of
 

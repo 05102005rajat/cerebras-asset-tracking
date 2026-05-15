@@ -189,7 +189,8 @@ describe("performDeploy", () => {
 
     expect(updateFacilities).toHaveBeenCalledWith({
       tagged_id: "C0009001",
-      rack_location: "Lab-Building-B/Bay-9//R-9/P-01",
+      // Filter-null format matches the seed convention.
+      rack_location: "Lab-Building-B/Bay-9/R-9/P-01",
     });
     expect(updateFinance).toHaveBeenCalledWith(
       expect.objectContaining({

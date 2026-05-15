@@ -171,6 +171,55 @@ describe("reconcile", () => {
     expect(r.issues.find((i) => i.category === "site_mismatch")).toBeDefined();
   });
 
+  it("flags in_service asset with no finance row as needs_action (off-the-books)", () => {
+    const r = reconcile([asset()], [facility()], [], now);
+    const issue = r.issues.find((i) => i.category === "missing_in_finance");
+    expect(issue?.severity).toBe("needs_action");
+    expect(issue?.headline).toContain("In service");
+  });
+
+  it("flags disposed asset with no finance row as needs_action", () => {
+    const r = reconcile([asset({ state: "disposed" })], [], [], now);
+    const issue = r.issues.find((i) => i.category === "missing_in_finance");
+    expect(issue?.severity).toBe("needs_action");
+    expect(issue?.headline).toContain("Disposed");
+  });
+
+  it("flags received asset with no finance row as watch (early-lifecycle)", () => {
+    // Catches the seeded C0000107 case: received in ops, no finance row at all.
+    const r = reconcile([asset({ state: "received" })], [], [], now);
+    const issue = r.issues.find(
+      (i) => i.category === "early_lifecycle_no_finance",
+    );
+    expect(issue?.severity).toBe("watch");
+  });
+
+  it("treats facilities row in legacy double-slash format as equivalent to filtered format", () => {
+    // An older write may have left an empty slot; we should not flag that
+    // as drift if the parts agree.
+    const r = reconcile(
+      [
+        asset({
+          location: {
+            site: "Lab-Building-A",
+            room: "Bay-12",
+            row: null,
+            rack: "B-04",
+            ru: "P-02",
+          },
+        }),
+      ],
+      [
+        facility({
+          rack_location: "Lab-Building-A/Bay-12//B-04/P-02",
+        }),
+      ],
+      [finance()],
+      now,
+    );
+    expect(r.issues.find((i) => i.category === "rack_mismatch")).toBeUndefined();
+  });
+
   it("orders needs_action issues before watch", () => {
     const r = reconcile(
       [asset({ state: "received" })],

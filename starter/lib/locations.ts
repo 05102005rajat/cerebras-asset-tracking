@@ -64,13 +64,23 @@ export function formatLocation(loc: Location | null | undefined): string {
   return parts.length > 0 ? parts.join(" / ") : "—";
 }
 
-// Facilities mock uses `site/room/row/rack/ru`. We collapse missing trailing
-// segments so the comparison matches its serialization.
+// Facilities mock stores rack locations as flat strings. The seeded data
+// uses the convention "drop null slots, then join" — so an asset with row
+// missing renders as `Site/Room/Rack/RU`, not `Site/Room//Rack/RU`. Adopt
+// the same convention so the strings we write match the seed's strings,
+// and so a partial location renders cleanly to a manager.
 export function locationToFacilitiesString(loc: Location): string {
-  const parts = [loc.site, loc.room, loc.row, loc.rack, loc.ru].map((p) =>
-    p ?? "",
-  );
-  return parts.join("/");
+  return [loc.site, loc.room, loc.row, loc.rack, loc.ru]
+    .filter((p): p is string => Boolean(p))
+    .join("/");
+}
+
+// Defensive normalizer for facilities-side strings — splits on '/', strips
+// empty segments (covering older writes that used the leave-empty-slot
+// convention), and rejoins. Use this on both sides of the comparison so
+// reconcile is robust to both formats coexisting in the same dataset.
+export function normalizeRackPath(s: string): string {
+  return s.split("/").filter((p) => p.length > 0).join("/");
 }
 
 export function isCompleteDeployLocation(loc: Location): boolean {
