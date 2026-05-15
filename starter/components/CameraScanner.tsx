@@ -19,6 +19,17 @@ export function CameraScanner({
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Keep the callbacks in refs so the effect doesn't restart the camera
+  // every time the parent re-renders with new closure identities. We only
+  // want to tear down when `open` toggles, not on every keystroke up the
+  // tree.
+  const onDecodeRef = useRef(onDecode);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onDecodeRef.current = onDecode;
+    onCloseRef.current = onClose;
+  }, [onDecode, onClose]);
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -54,8 +65,8 @@ export function CameraScanner({
             if (result) {
               const text = result.getText();
               ctrls.stop();
-              onDecode(text);
-              onClose();
+              onDecodeRef.current(text);
+              onCloseRef.current();
             }
           },
         );
@@ -77,7 +88,7 @@ export function CameraScanner({
       stopRef.current = null;
       setReady(false);
     };
-  }, [open, onDecode, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

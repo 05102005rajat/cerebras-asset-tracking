@@ -29,11 +29,7 @@ export type IssueCategory =
   // watch
   | "stale_facilities_observation"
   | "finance_pending_after_receive"
-  | "early_lifecycle_no_finance"
-  // info / explained-by-state (we don't usually surface these but include for transparency)
-  | "stored_not_in_facilities"
-  | "rma_not_in_facilities"
-  | "disposed_not_in_facilities";
+  | "early_lifecycle_no_finance";
 
 export type ReconcileReport = {
   generated_at: string;
@@ -310,9 +306,6 @@ export const CATEGORY_LABEL: Record<IssueCategory, string> = {
   stale_facilities_observation: "Stale observation",
   finance_pending_after_receive: "Finance lagging",
   early_lifecycle_no_finance: "Awaiting finance",
-  stored_not_in_facilities: "Stored — facilities-blind",
-  rma_not_in_facilities: "RMA — facilities-blind",
-  disposed_not_in_facilities: "Disposed — facilities-blind",
 };
 
 export const SEVERITY_LABEL: Record<Severity, string> = {

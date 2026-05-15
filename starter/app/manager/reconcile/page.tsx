@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { EmptyState } from "@/components/EmptyState";
 import {
   CATEGORY_LABEL,
-  SEVERITY_LABEL,
   type Issue,
   type ReconcileReport,
 } from "@/lib/reconcile";
@@ -44,7 +43,6 @@ export default async function ManagerReconcilePage() {
 
   const needsAction = report.issues.filter((i) => i.severity === "needs_action");
   const watch = report.issues.filter((i) => i.severity === "watch");
-  const info = report.issues.filter((i) => i.severity === "info");
 
   return (
     <div className="space-y-6">
@@ -68,7 +66,7 @@ export default async function ManagerReconcilePage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Tile
           severity="needs_action"
           count={needsAction.length}
@@ -80,12 +78,6 @@ export default async function ManagerReconcilePage() {
           count={watch.length}
           label="Watch"
           sub="Flag if it persists"
-        />
-        <Tile
-          severity="info"
-          count={info.length}
-          label="Info"
-          sub="Explained by state"
         />
       </div>
 
@@ -138,7 +130,7 @@ function Tile({
   label,
   sub,
 }: {
-  severity: "needs_action" | "watch" | "info";
+  severity: "needs_action" | "watch";
   count: number;
   label: string;
   sub: string;
@@ -146,12 +138,10 @@ function Tile({
   const tone = {
     needs_action: "border-red-200 bg-red-50",
     watch: "border-amber-200 bg-amber-50",
-    info: "border-gray-200 bg-gray-50",
   }[severity];
   const text = {
     needs_action: "text-red-900",
     watch: "text-amber-900",
-    info: "text-gray-700",
   }[severity];
   return (
     <div className={`border rounded-lg p-4 ${tone}`}>

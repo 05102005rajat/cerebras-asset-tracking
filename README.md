@@ -54,7 +54,7 @@ The tradeoff: the receive form is now context-aware in a way the brief doesn't a
 
 The naive read of "build a reconciliation report" is: walk all three sources, emit a row for every disagreement, sort by tag. I built and threw away that version — it produced a 700-row table that a manager can't act on.
 
-The version I shipped classifies into three severities and nine categories, with the category names tuned to the action the manager would take:
+The version I shipped classifies issues into two severities (`needs_action` and `watch`) and the following categories, with names tuned to the action the manager would take:
 
 | Category | What it actually means |
 |---|---|
@@ -118,9 +118,10 @@ test/
   tag-validate.test.ts               # 5 tests — context-aware scan rejection (LOC|/BADGE|/garbage)
   csv.test.ts                        # 4 tests — RFC-4180 reconcile export
   ScanInput.test.tsx                 # 3 tests (provided)
+  sort-assets.test.ts                # 7 tests — sort key parsing + lifecycle-ordered state
 ```
 
-50 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
+57 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
 
 ## Pushback on the brief
 
@@ -151,7 +152,7 @@ Three sentences, three jobs: explain why the form looks pre-filled, tell them wh
 - TypeScript, Tailwind 3
 - `@zxing/browser` for the camera scanner (lazy-imported so non-camera flows skip the bundle)
 - `bwip-js` for server-rendered Code 128 PNGs on the barcode page
-- Vitest for unit tests (35 passing)
+- Vitest for unit tests
 
 ## Accessibility & polish
 

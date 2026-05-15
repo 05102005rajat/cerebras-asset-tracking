@@ -134,7 +134,7 @@ Show: home page.
 >
 > [Click the drift topline → reconcile page]
 >
-> "The report is categorized, not diffed — three severities, nine categories. *Needs action* at the top, grouped by category so a single botched migration that produces 80 rack mismatches reads as one chunk, not a fire. I write the category names in the language of the action the manager would take — *Walk the row*, *Send finance the retire-out*, *Awaiting finance*."
+> "The report is categorized, not diffed — two severities, ten categories. *Needs action* at the top, grouped by category so a single botched migration that produces 80 rack mismatches reads as one chunk, not a fire. I write the category names in the language of the action the manager would take — *Walk the row*, *Send finance the retire-out*, *Awaiting finance*."
 >
 > [Scroll to a ghost issue, point at "Resolve via Receive →"]
 >

@@ -1,30 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { Asset } from "@/lib/types";
 import type { Severity } from "@/lib/reconcile";
+import type { SortDir, SortKey } from "@/lib/sort-assets";
 import { StateBadge } from "./StateBadge";
 import { formatLocation } from "@/lib/locations";
 import { relativeTime, shortIso } from "@/lib/format";
-
-type SortKey = "asset_tag" | "model" | "state" | "custodian" | "site" | "updated_at";
-type SortDir = "asc" | "desc";
-
-const STATE_ORDER: Record<string, number> = {
-  unreceived: 0,
-  received: 1,
-  stored: 2,
-  in_service: 3,
-  rma_pending: 4,
-  disposed: 5,
-};
 
 // Manager's primary view. Columns chosen for the 8:55am pre-standup glance:
 // tag, identity, state, custodian, where it sits, and how recently it moved.
 // We intentionally hide procurement_note and parent_asset_tag — they're rarely
 // what the manager came to see, and they make the table noisy.
+//
+// Sort + filter live in the URL (server-rendered by the page). The table is
+// a presentational component: it doesn't reorder rows, just renders the
+// header buttons that re-emit a URL with `?sort=...`.
 //
 // Drift dots come from a precomputed map (the dashboard already runs the
 // classifier once for the topline; we reuse the result here so the manager
@@ -33,34 +25,29 @@ export function AssetTable({
   assets,
   driftMap,
   preserveSearch,
+  sortKey,
+  sortDir,
 }: {
   assets: Asset[];
   driftMap: Map<string, Severity>;
   preserveSearch: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const sort = (searchParams.get("sort") ?? "updated_at:desc") as `${SortKey}:${SortDir}`;
-  const [sortKey, sortDir] = sort.split(":") as [SortKey, SortDir];
-
-  const sorted = useMemo(() => {
-    const arr = [...assets];
-    arr.sort((a, b) => {
-      const av = readKey(a, sortKey);
-      const bv = readKey(b, sortKey);
-      const cmp = compare(av, bv);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return arr;
-  }, [assets, sortKey, sortDir]);
-
   function setSort(nextKey: SortKey): void {
     const params = new URLSearchParams(searchParams.toString());
-    let nextDir: SortDir = nextKey === sortKey
-      ? (sortDir === "asc" ? "desc" : "asc")
-      : nextKey === "updated_at" ? "desc" : "asc";
+    const nextDir: SortDir =
+      nextKey === sortKey
+        ? sortDir === "asc"
+          ? "desc"
+          : "asc"
+        : nextKey === "updated_at"
+          ? "desc"
+          : "asc";
     params.set("sort", `${nextKey}:${nextDir}`);
     params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
@@ -92,7 +79,7 @@ export function AssetTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {sorted.map((a) => {
+          {assets.map((a) => {
             const drift = driftMap.get(a.asset_tag);
             return (
               <tr key={a.asset_tag} className="hover:bg-blue-50/40">
@@ -208,28 +195,6 @@ function Td({
       {children}
     </td>
   );
-}
-
-function readKey(a: Asset, key: SortKey): string | number {
-  switch (key) {
-    case "asset_tag":
-      return a.asset_tag;
-    case "model":
-      return a.model;
-    case "state":
-      return STATE_ORDER[a.state] ?? 99;
-    case "custodian":
-      return a.custodian;
-    case "site":
-      return a.location.site ?? "";
-    case "updated_at":
-      return a.updated_at;
-  }
-}
-
-function compare(a: string | number, b: string | number): number {
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  return String(a).localeCompare(String(b));
 }
 
 function hrefWithReturn(href: string, search: string): string {

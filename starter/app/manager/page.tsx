@@ -6,6 +6,7 @@ import { FilterChips } from "@/components/FilterChips";
 import { Pagination } from "@/components/Pagination";
 import { DriftTopline } from "@/components/DriftTopline";
 import { EmptyState } from "@/components/EmptyState";
+import { parseSort, sortAssets } from "@/lib/sort-assets";
 import type { Asset, AssetState } from "@/lib/types";
 
 const PAGE_SIZE = 25;
@@ -44,9 +45,14 @@ export default async function ManagerLandingPage({
   ]);
 
   const filtered = applyFilters(allAssets, { state, site, custodian, q });
-  const total = filtered.length;
+  // Sort BEFORE pagination — otherwise sorting only reorders the visible 25
+  // rows, which is wrong: a manager sorting by "oldest update first" would
+  // expect the oldest asset overall, not the oldest in this page.
+  const { key: sortKey, dir: sortDir } = parseSort(readOne(sp.sort));
+  const sorted = sortAssets(filtered, sortKey, sortDir);
+  const total = sorted.length;
   const start = (page - 1) * PAGE_SIZE;
-  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const slice = sorted.slice(start, start + PAGE_SIZE);
 
   const report = reconcile(allAssets, facilities, finance);
 
@@ -74,7 +80,7 @@ export default async function ManagerLandingPage({
 
   // Pass the active query string to the table so each link can preserve it
   // — clicking back from the detail page returns to this exact filter set.
-  const preserveSearch = await searchParamsToString(sp);
+  const preserveSearch = searchParamsToString(sp);
 
   return (
     <div className="space-y-5">
@@ -112,6 +118,8 @@ export default async function ManagerLandingPage({
             assets={slice}
             driftMap={driftMap}
             preserveSearch={preserveSearch}
+            sortKey={sortKey}
+            sortDir={sortDir}
           />
           <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
         </>
@@ -150,9 +158,9 @@ function readOne(v: string | string[] | undefined): string | undefined {
   return v;
 }
 
-async function searchParamsToString(
+function searchParamsToString(
   sp: Record<string, string | string[] | undefined>,
-): Promise<string> {
+): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) {
     if (v == null) continue;
