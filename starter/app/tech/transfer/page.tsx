@@ -8,11 +8,8 @@ import { ScanLog, type ScanLogEntry } from "@/components/ScanLog";
 import { AssetSummary } from "@/components/AssetSummary";
 import { clientScans, fetchAsset } from "@/lib/client-scans";
 import { ApiError } from "@/lib/api-client";
-import {
-  isAssetTag,
-  isBadgePayload,
-  parseBadgePayload,
-} from "@/lib/locations";
+import { isBadgePayload, parseBadgePayload } from "@/lib/locations";
+import { validateAssetTagScan } from "@/lib/tag-validate";
 import { getCurrentUserId } from "@/lib/auth";
 import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { Asset } from "@/lib/types";
@@ -80,11 +77,9 @@ export default function TechTransferPage() {
   }
 
   async function handleAssetScan(value: string): Promise<void> {
-    if (!isAssetTag(value)) {
-      recordError(
-        new ApiError(400, "invalid_tag_format", `"${value}" isn't a tag.`),
-        value,
-      );
+    const validationError = validateAssetTagScan(value);
+    if (validationError) {
+      recordError(validationError, value);
       return;
     }
     setError(null);

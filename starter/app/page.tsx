@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DevResetButton } from "@/components/DevResetButton";
 
 export default function HomePage() {
   return (
@@ -45,7 +46,7 @@ export default function HomePage() {
         />
       </section>
 
-      <section className="text-xs text-gray-500 border-t pt-4 space-y-1">
+      <section className="text-xs text-gray-500 border-t pt-4 space-y-2">
         <div>
           Use the{" "}
           <span className="font-medium text-gray-700">role switcher</span> in
@@ -54,11 +55,14 @@ export default function HomePage() {
           server-side.
         </div>
         <div>
-          Brief at{" "}
+          Test barcodes at{" "}
           <Link className="underline" href="/dev/barcodes">
             /dev/barcodes
           </Link>{" "}
           — print, scan, repeat.
+        </div>
+        <div className="pt-1">
+          <DevResetButton />
         </div>
       </section>
     </div>

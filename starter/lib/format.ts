@@ -94,6 +94,10 @@ export function guidanceForCode(
       return "This asset is already in your custody. Hand it off to someone else, or skip the transfer.";
     case "rate_limited":
       return "Slow down — the API is rate-limiting. Try again in a few seconds.";
+    case "wrong_scan_type_location":
+      return "You scanned a location label where the asset tag goes. Scan the asset's tag (Cxxxxxxx), then the location below.";
+    case "wrong_scan_type_badge":
+      return "You scanned a badge where the asset tag goes. Badges go in the second step of /tech/transfer.";
     default:
       return "Something went wrong. Try the scan again. If it keeps failing, flag it to your manager.";
   }

@@ -9,7 +9,8 @@ import { LocationFields } from "@/components/LocationFields";
 import { AssetSummary } from "@/components/AssetSummary";
 import { clientScans, fetchAsset } from "@/lib/client-scans";
 import { ApiError } from "@/lib/api-client";
-import { isAssetTag, emptyLocation } from "@/lib/locations";
+import { emptyLocation } from "@/lib/locations";
+import { validateAssetTagScan } from "@/lib/tag-validate";
 import { tactileError, tactileSuccess } from "@/lib/scan-feedback";
 import type { Asset, Location } from "@/lib/types";
 import type { SideEffect } from "@/lib/scan-server";
@@ -77,15 +78,9 @@ export default function TechStorePage() {
   }
 
   async function handleTagScan(value: string): Promise<void> {
-    if (!isAssetTag(value)) {
-      recordError(
-        new ApiError(
-          400,
-          "invalid_tag_format",
-          `"${value}" isn't a valid tag.`,
-        ),
-        value,
-      );
+    const validationError = validateAssetTagScan(value);
+    if (validationError) {
+      recordError(validationError, value);
       return;
     }
     setError(null);

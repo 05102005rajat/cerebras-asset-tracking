@@ -7,5 +7,7 @@ node_modules
 # SQLite WAL/SHM are runtime artifacts of the local API
 api/data/*.db-shm
 api/data/*.db-wal
+# Stray data dir if API ever starts from the monorepo root
+/data/
 # TS incremental build cache
 **/tsconfig.tsbuildinfo

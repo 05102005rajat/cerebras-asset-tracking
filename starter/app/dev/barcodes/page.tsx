@@ -52,13 +52,29 @@ export default async function DevBarcodesPage() {
     return assets.find(predicate) ?? null;
   }
 
-  const inService = pick((a) => a.state === "in_service" && !driftedTags.has(a.asset_tag));
+  const inService = pick(
+    (a) => a.state === "in_service" && !driftedTags.has(a.asset_tag),
+  );
   const stored = pick((a) => a.state === "stored");
   const received = pick((a) => a.state === "received");
   const drifted = pick((a) => driftedTags.has(a.asset_tag));
   const disposed = pick((a) => a.state === "disposed");
 
-  const featured: Array<{ label: string; reason: string; asset: Asset | null }> = [
+  // Ghost tags live in facilities or finance but NOT in the ops list.
+  // We surface them so the reviewer can scan one and watch the "unknown_asset"
+  // path on store/deploy/transfer — or scan it into /tech/receive and create
+  // the asset for the first time, which resolves the ghost.
+  const facilityGhost =
+    facilities.find((f) => !assets.some((a) => a.asset_tag === f.tagged_id))
+      ?.tagged_id ?? null;
+  const financeGhost =
+    finance.find((f) => !assets.some((a) => a.asset_tag === f.tag))?.tag ?? null;
+
+  const featured: Array<{
+    label: string;
+    reason: string;
+    asset: Asset | null;
+  }> = [
     {
       label: "Healthy in_service asset",
       reason: "Use this on /tech/store to test de-rack.",
@@ -75,16 +91,35 @@ export default async function DevBarcodesPage() {
       asset: received,
     },
     {
-      label: "Drifted asset",
-      reason: "One the reconciliation report flags. Inspect on /manager/assets/[tag].",
+      label: "Drifted asset (rack-mismatch)",
+      reason:
+        "One the reconciliation report flags. Open /manager/assets/[tag] to see the side-by-side comparison.",
       asset: drifted,
     },
     {
       label: "Disposed asset",
-      reason: "Scan it on /tech/store to see the invalid_transition error.",
+      reason: "Scan on /tech/store or /tech/deploy to see invalid_transition.",
       asset: disposed,
     },
   ];
+
+  const ghostCards: Array<{ label: string; tag: string; reason: string }> = [];
+  if (facilityGhost) {
+    ghostCards.push({
+      label: "Ghost in facilities",
+      tag: facilityGhost,
+      reason:
+        "Facilities knows this tag; ops doesn't. Scan on /tech/store or /tech/deploy to see unknown_asset. Or scan on /tech/receive to create the ops record and resolve the ghost.",
+    });
+  }
+  if (financeGhost) {
+    ghostCards.push({
+      label: "Ghost in finance",
+      tag: financeGhost,
+      reason:
+        "Finance carries this tag (status: pending_receipt); ops doesn't. Scan on /tech/receive to create it for the first time.",
+    });
+  }
 
   // A few useful location codes. The string format matches what the
   // LocationFields scanner expects.
@@ -171,6 +206,28 @@ export default async function DevBarcodesPage() {
           )}
         </div>
       </section>
+
+      {ghostCards.length > 0 ? (
+        <section>
+          <h2 className="font-semibold text-sm text-gray-900 mb-3">
+            Ghost / orphan tags
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {ghostCards.map((g) => (
+              <Card
+                key={g.label}
+                title={g.label}
+                subtitle={g.reason}
+                payload={g.tag}
+              >
+                <div className="mt-1 text-xs text-amber-700 font-mono">
+                  not in ops · seeded for reconciliation testing
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="break-before-page">
         <h2 className="font-semibold text-sm text-gray-900 mb-3">
