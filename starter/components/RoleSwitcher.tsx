@@ -36,18 +36,20 @@ export function RoleSwitcher() {
     }
   }
 
-  const label =
+  const fullLabel =
     role === "tech" ? "Switch to manager view" : "Switch to tech view";
+  const shortLabel = role === "tech" ? "→ Manager" : "→ Tech";
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50 min-h-[44px]"
-      aria-label={label}
+      className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50 min-h-[44px] whitespace-nowrap"
+      aria-label={fullLabel}
     >
       <span className="text-gray-500 mr-2 hidden sm:inline">role: {role}</span>
-      <span className="font-medium">{label}</span>
+      <span className="font-medium hidden sm:inline">{fullLabel}</span>
+      <span className="font-medium sm:hidden">{shortLabel}</span>
     </button>
   );
 }

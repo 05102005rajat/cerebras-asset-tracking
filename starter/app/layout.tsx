@@ -24,12 +24,14 @@ export default function RootLayout({
           Skip to main content
         </a>
         <header className="border-b bg-white sticky top-0 z-30">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <a href="/" className="font-semibold text-gray-900 whitespace-nowrap">
               Asset tracking
             </a>
-            <PrimaryNav />
             <RoleSwitcher />
+            <div className="w-full sm:w-auto sm:flex-1 sm:flex sm:justify-center order-last sm:order-none">
+              <PrimaryNav />
+            </div>
           </div>
         </header>
         <main id="main" className="max-w-5xl mx-auto px-4 py-6">
