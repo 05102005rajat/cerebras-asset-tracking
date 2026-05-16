@@ -110,13 +110,13 @@ export function CameraScanner({
           Cancel
         </button>
       </div>
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-4">
         {error ? (
           <div className="text-red-300 text-center max-w-sm text-sm">
             {error}
           </div>
         ) : (
-          <div className="relative w-full max-w-md aspect-square">
+          <div className="relative w-full max-w-md h-full max-h-full mx-auto">
             <video
               ref={videoRef}
               className="w-full h-full object-cover rounded-lg bg-black"
