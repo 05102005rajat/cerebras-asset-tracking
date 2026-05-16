@@ -4,15 +4,19 @@ Everything you need to submit before Sunday. Open this file in your editor, foll
 
 ---
 
-## 0. The current state of the build
+## 0. Current state — DEPLOYED ✓
 
-- **Working tree:** clean, all changes committed
-- **Branch:** `main` with 5 commits on top of upstream `0129f69`
-- **Tests:** 50 / 50 passing
+- **GitHub repo:** <https://github.com/05102005rajat/cerebras-asset-tracking>
+- **Frontend (Vercel):** <https://cerebras-asset-tracking-starter.vercel.app>
+- **API (Render):** <https://cerebras-asset-tracking-1.onrender.com>
+- **Tests:** 57 / 57 passing
 - **Type-check:** clean
-- **Production build:** clean, all routes generated
+- **Production build:** clean, all 17 routes generated
+- **Deployed verification:** all major routes return HTTP 200, real seeded data flows end-to-end
 
-Local dev still running at <http://localhost:3000> (API at :8080). If those are stopped, restart with:
+What's left: record the Loom (§4), submit the form (§5), email Daniel (§6).
+
+### If you need to restart local dev
 
 ```bash
 cd /Users/rajat/Desktop/trying1/ai-builder-challenge
@@ -22,79 +26,40 @@ cd starter && npx next dev -p 3000 &       # in another
 
 ---
 
-## 1. Push to GitHub (5 min)
+## 1. Push to GitHub — DONE ✓
 
-```bash
-cd /Users/rajat/Desktop/trying1/ai-builder-challenge
+Repo is live and public at <https://github.com/05102005rajat/cerebras-asset-tracking>.
 
-# Create a new GitHub repo named whatever you like. Public.
-# Then:
-gh repo create cerebras-asset-tracking --public --source=. --push
-# OR, if you don't have gh CLI:
-#   1. Create the repo at https://github.com/new (public, no README/license).
-#   2. Then:
-#   git remote add origin https://github.com/05102005rajat/cerebras-asset-tracking.git
-#   git push -u origin main
-```
-
-Verify the public URL loads: <https://github.com/05102005rajat/cerebras-asset-tracking>
+Daniel's upstream is preserved as the `upstream` git remote in case you ever need to pull updates.
 
 ---
 
-## 2. Deploy (15-30 min)
+## 2. Deploy — DONE ✓
 
-You need a public URL where the app runs. Two pieces: the **frontend** (Vercel) and the **API** (either Cerebras-hosted, or your own deploy).
+Confirmed there is **no hosted API** in the candidate email or the public repo. The brief's "hosted API" language meant "this API, when running" — every candidate deploys both the API and frontend themselves.
 
-### 2a. Find the hosted API URL — try this first
+### API (Render, Docker auto-detected from `api/Dockerfile`)
 
-The brief at `docs/CHALLENGE.md` says *"A hosted API holds ~1,000 seeded assets…"*. The candidate-facing email from Daniel **should have included** the public `API_BASE_URL` and `API_TOKEN`.
+- **URL:** <https://cerebras-asset-tracking-1.onrender.com>
+- **Env:** `API_TOKEN=local-dev-token-1234567890`
+- **Note:** free tier spins down after 15 min idle → first request takes ~30-50s while it cold-starts. Mention in the Loom if it bites during demo. Acknowledge it as a free-tier artifact, not a code issue, and move on.
 
-- **Check the original challenge email or the submission form** for these.
-- If they're not there, email Daniel (`Daniel.Kim@cerebras.net`) — quote the relevant line from the brief. This is a clarifying question, not a complaint; the brief itself implies these should have been provided.
+Two upstream-Dockerfile issues had to be fixed before this would build:
+- pnpm@11.1.1 via corepack on Render's Node 20 Alpine throws `ERR_UNKNOWN_BUILTIN_MODULE`. Rewrote `api/Dockerfile` to use `npm` instead.
+- (See commit `1115841`.)
 
-### 2b. If no hosted API is available, deploy the API yourself
+### Frontend (Vercel, Next.js auto-detected from `starter/`)
 
-The API is a small Node + Fastify + SQLite app — Render's free tier hosts it in 5 minutes:
+- **URL:** <https://cerebras-asset-tracking-starter.vercel.app>
+- **Root Directory:** `starter`
+- **Install Command:** overridden to `npm install` (avoid the same corepack/pnpm trap)
+- **Env vars:**
+  - `API_BASE_URL=https://cerebras-asset-tracking-1.onrender.com/v1`
+  - `API_TOKEN=local-dev-token-1234567890`
 
-```bash
-# In the api/ directory there's already a Dockerfile and docker-compose.yml.
-# On Render:
-#   New → Web Service → Connect your GitHub repo
-#   Root directory:    api
-#   Build command:     npm install && npm run build
-#   Start command:     npm run start
-#   Free instance type.
-# After deploy, note the URL — e.g. https://your-api.onrender.com
-# Test: curl https://your-api.onrender.com/health  →  {"ok":true,...}
-```
-
-(Railway and Fly.io work just as well; Render is the most click-through-able.)
-
-### 2c. Deploy the frontend to Vercel
-
-```bash
-# Easiest path:
-cd starter && npx vercel
-# It will prompt:
-#   Set up and deploy "starter"?  → yes
-#   Which scope?                  → your personal scope
-#   Link to existing project?     → no
-#   What's your project's name?   → cerebras-asset-tracking
-#   In which directory is your code located?  → ./
-#   Auto-detected: Next.js. Override? → no
-```
-
-After the first deploy, set env vars in the Vercel dashboard
-(<https://vercel.com/your-name/cerebras-asset-tracking/settings/environment-variables>):
-
-| Key | Value |
-|---|---|
-| `API_BASE_URL` | The hosted API URL from step 2a/2b, with `/v1` suffix |
-| `API_TOKEN`    | The token from the challenge email, or `local-dev-token-1234567890` if you self-deployed |
-
-Then **redeploy** so the env vars take effect (or just `npx vercel --prod`).
-
-Verify the public URL loads, then click through `/tech`, `/manager`, `/manager/reconcile`, `/dev/barcodes`. They should all 200 and show seeded data.
+Two issues fixed during deploy:
+- `@zxing/library@^0.23.0` conflicted with `@zxing/browser@0.2.0`'s peer requirement `^0.22.0`. Pinned to `^0.22.0` since we only import from `@zxing/browser`. (Commit `5290531`.)
+- Vercel auto-blocks deploys of `next@15.0.4` due to CVE-2025-66478. Bumped to `15.5.18` (latest stable 15.x patch), matching `eslint-config-next`. (Commit `d53466f`.)
 
 ---
 
@@ -180,15 +145,13 @@ Paste exactly these into the form fields:
 
 **Public URL:**
 ```
-https://cerebras-asset-tracking.vercel.app
+https://cerebras-asset-tracking-starter.vercel.app
 ```
-(Your actual Vercel URL.)
 
 **GitHub link:**
 ```
 https://github.com/05102005rajat/cerebras-asset-tracking
 ```
-(Your actual GitHub URL.)
 
 **Loom link:**
 The URL Loom gives you after you stop recording.
