@@ -4,21 +4,17 @@ RUN apk add --no-cache python3 make g++ sqlite
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
-
 COPY package.json tsconfig.json ./
-RUN pnpm install --prod=false --frozen-lockfile=false
+RUN npm install --include=dev --no-audit --no-fund
 
 COPY src ./src
-RUN pnpm build
+RUN npm run build
 
 FROM node:20-alpine AS runner
 
 RUN apk add --no-cache sqlite
 
 WORKDIR /app
-
-RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
