@@ -93,21 +93,41 @@ If any step fails on the deployed URL, fix it before recording.
 
 Show: home page.
 
-### Beat 2 (0:30–1:30) — The manager side, where the work starts
+### Beat 2 (0:30–1:55) — The manager side, where the work starts
 
-> "The manager opens this at 8:55am before standup. The first thing the page tells them is whether anything actually needs their attention — the drift summary at the top, in this case '6 items need investigation, 2 more to watch.' There are filter chips, sortable columns, and a small dot on every row that has an open issue."
+> "The manager opens this at 8:55am before standup.
 >
-> [Click the drift summary → reconcile page]
+> The first thing the page tells them is whether anything needs attention — in this case, six items need investigation, and two more are worth watching."
+
+[pause, hover over summary]
+
+> "There are filter chips, sortable columns, and a status indicator on every row with an open issue."
+
+[click Open report → reconcile page]
+
+> "The report is grouped, not just a flat list of differences. First by severity — Needs action and Watch — then by category."
+
+[slow scroll into Needs action]
+
+> "And the categories are named in the language of what the manager would actually do.
 >
-> "The report is grouped, not just a list of differences. Two levels — *Needs action* and *Watch* — and inside that, ten clear categories. One bad migration that creates 80 rack mismatches shows up as one group, not as 80 separate fires. I named the categories in the language of what the manager would actually do — *Walk the row*, *Send finance the retire-out*, *Awaiting finance*."
+> Walk the row.
 >
-> [Scroll to a ghost issue, point at "Resolve via Receive →"]
+> Send finance the retire-out.
 >
-> "For ghosts — where facilities or finance has a tag that ops doesn't know about — the link goes straight to /tech/receive with the tag already filled in, because the action is to receive it for the first time."
->
-> [Click "Export CSV"]
->
-> "There's a CSV export too, so the manager can hand the list to procurement after standup."
+> Awaiting finance."
+
+[pause on a ghost issue, hover "Resolve via Receive →"]
+
+> "For ghost assets — where facilities or finance has a tag operations doesn't recognize — the link goes straight into the receive workflow with the tag already filled in. The fix isn't reconciliation — it's receiving it for the first time."
+
+[brief pause]
+
+> "The categories aren't labels. They're routing instructions for human action."
+
+[click Export CSV]
+
+> "And there's a CSV export so finance or procurement can take this offline right after standup."
 
 ### Beat 3 (1:30–2:30) — The scan side
 
