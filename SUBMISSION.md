@@ -87,53 +87,53 @@ If any step fails on the deployed URL, fix it before recording.
 
 **Script — total ~3:45**
 
-### Beat 1 (0:00–0:30) — Frame the system
+### Beat 1 (0:00–0:30) — Set the stage
 
-> "I'm Rajat. This is the asset-tracking submission. A multi-site research lab tracks instruments across three systems — operations, facilities, finance — that disagree by default. The whole product is the work of keeping them aligned. Two surfaces: a phone-first tech surface for scan workflows, and a desktop manager surface for the dashboard, asset detail, and the reconciliation report."
+> "I'm Rajat. This is the asset-tracking submission. A research lab tracks instruments across three systems — operations, facilities, and finance — that disagree by default. The whole app is the work of keeping them in sync. There are two sides: a phone-first tech side for scan workflows, and a desktop manager side for the dashboard, asset details, and the reconcile report."
 
 Show: home page.
 
-### Beat 2 (0:30–1:30) — Manager surface, where the work begins
+### Beat 2 (0:30–1:30) — The manager side, where the work starts
 
-> "The manager opens this at 8:55am before standup. The first thing the page tells them is whether anything actually needs them — drift topline at the top, in this case '6 items need investigation, 2 to watch.' Filter chips, sortable columns, a drift dot on every row that has an open issue."
+> "The manager opens this at 8:55am before standup. The first thing the page tells them is whether anything actually needs their attention — the drift summary at the top, in this case '6 items need investigation, 2 more to watch.' There are filter chips, sortable columns, and a small dot on every row that has an open issue."
 >
-> [Click the drift topline → reconcile page]
+> [Click the drift summary → reconcile page]
 >
-> "The report is categorized, not diffed — two severities, ten categories. *Needs action* at the top, grouped by category so a single botched migration that produces 80 rack mismatches reads as one chunk, not a fire. I write the category names in the language of the action the manager would take — *Walk the row*, *Send finance the retire-out*, *Awaiting finance*."
+> "The report is grouped, not just a list of differences. Two levels — *Needs action* and *Watch* — and inside that, ten clear categories. One bad migration that creates 80 rack mismatches shows up as one group, not as 80 separate fires. I named the categories in the language of what the manager would actually do — *Walk the row*, *Send finance the retire-out*, *Awaiting finance*."
 >
 > [Scroll to a ghost issue, point at "Resolve via Receive →"]
 >
-> "For ghosts — where facilities or finance carries a tag ops doesn't know about — the link goes straight to /tech/receive with the tag prefilled, because the action is to receive it for the first time."
+> "For ghosts — where facilities or finance has a tag that ops doesn't know about — the link goes straight to /tech/receive with the tag already filled in, because the action is to receive it for the first time."
 >
 > [Click "Export CSV"]
 >
-> "Export — same data, CSV — so the manager can hand it to procurement after standup."
+> "There's a CSV export too, so the manager can hand the list to procurement after standup."
 
-### Beat 3 (1:30–2:30) — The scan UX
+### Beat 3 (1:30–2:30) — The scan side
 
 Phone view, or 375px wide DevTools.
 
-> "Now the tech. Phone, gloves, cold dock bay, scanner in one hand or just the phone camera. I built for continuous-scan: success banner stays visible while the input clears and re-focuses for the next scan, no auto-dismiss timer, no waiting."
+> "Now the tech side. Phone, gloves, cold dock bay, scanner in one hand or just the phone camera. I built it for continuous scanning: the success message stays visible while the input clears and re-focuses for the next scan. No auto-dismiss timer. No waiting."
 >
-> [Show /tech/receive, scan C0009101 with a fresh serial → success → input is already armed for next]
+> [Show /tech/receive, scan C0009101 with a fresh serial → success → input is already ready for next]
 >
-> "When the tag is already on file — common at the dock — the form prefills from the existing record. The tech reads, glances, confirms. If a field is edited, it turns amber with 'edited' so they can see they're about to flag a divergence."
+> "When the tag is already on file — which is common at the dock — the form fills in from the existing record. The tech reads it, glances at the unit, and confirms. If they edit any field, it turns amber with an 'edited' tag, so they can see they're about to flag a mismatch."
 >
 > [Scan C0000101 — known asset. Banner shows "Tag already on file" with state badge.]
 >
-> "Errors are routed by code. If the tech scans a location label where the tag goes — easy to do at 11pm — I detect the LOC| prefix and tell them which scan to do first, instead of generic 'invalid format'."
+> "Errors are specific to the cause. If the tech scans a location label where the tag should go — easy to do at 11pm — the app sees the LOC prefix and tells them which scan to do first, instead of just saying 'invalid format'."
 >
-> [Try scanning a LOC| payload into the tag input → context-specific error message]
+> [Try scanning a LOC| payload into the tag input → specific error message]
 
-### Beat 4 (2:30–3:15) — One call I nearly made the other way + one piece of microcopy
+### Beat 4 (2:30–3:15) — One call I almost made the other way, and one piece of writing I'm proud of
 
-> "One design call: I almost left the success banner on a 4-second auto-dismiss timer. It demoed beautifully. It was wrong for the actual job — a tech mid-rhythm is already moving the next box; the 4-second window is long enough to feel slow and short enough to feel anxious. What shipped: banner stays until the next scan replaces it. The input clears and re-focuses immediately. On phones, navigator.vibrate gives a short double-pulse on success so the tech can tell what happened without looking."
+> "One design call: I almost left the success banner on a four-second auto-dismiss timer. It looked great in a demo. But it was wrong for the actual job. A tech in the middle of a scan rhythm is already reaching for the next box. Four seconds is long enough to feel slow, and short enough to feel anxious. What I shipped instead: the banner stays until the next scan replaces it. The input clears and re-focuses right away. On phones, the device gives a short double-buzz on success so the tech can tell what happened without looking."
 >
-> "And one piece of microcopy I'd point at: the empty state on the reconcile page when nothing is broken — 'All three systems agree on every asset. Most weeks you'll have something here — enjoy the quiet one.' Most empty states pretend the absence of data is normal; this one names it as the rare case it actually is."
+> "And one piece of writing I'd point out: the empty state on the reconcile page when nothing is broken — 'All three systems agree on every asset. Most weeks you'll have something here — enjoy the quiet one.' Most empty states pretend that no data is normal. This one says outright that it's the rare case."
 
 ### Beat 5 (3:15–3:45) — Wrap
 
-> "Architecture in one sentence: the reconciliation classifier and the scan-write orchestrator are pure functions tested in isolation; everything else is server components rendering whatever they need. Full write-up of the three calls I made and what I deliberately didn't build is in the README. Thanks for the review."
+> "The architecture in one sentence: the part that decides what's wrong and the part that writes back to all three systems are pure functions, tested on their own. Everything else is a server component that just renders what it needs. The full write-up of the three design calls I made, and what I chose not to build, is in the README. Thanks for the review."
 
 ---
 
