@@ -56,7 +56,7 @@ export function AssetTable({
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600 sticky top-[57px] z-10">
+        <thead className="bg-gray-50 text-gray-600">
           <tr>
             <Th onClick={() => setSort("asset_tag")} active={sortKey === "asset_tag"} dir={sortDir}>
               Tag
