@@ -89,7 +89,7 @@ If any step fails on the deployed URL, fix it before recording.
 
 ### Beat 1 (0:00–0:30) — Set the stage
 
-> "I'm Rajat. This is the asset-tracking submission. A research lab tracks instruments across three systems — operations, facilities, and finance — that disagree by default. The whole app is the work of keeping them in sync. There are two sides: a phone-first tech side for scan workflows, and a desktop manager side for the dashboard, asset details, and the reconcile report."
+> "I'm Rajat. This is the asset-tracking submission. A research lab tracks equipment across three systems — operations, facilities, and finance — that disagree by default. The whole app is the work of keeping them in sync. There are two sides: a phone-first tech side for scan workflows, and a desktop manager side for the dashboard, asset details, and the reconcile report."
 
 Show: home page.
 
