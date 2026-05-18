@@ -129,21 +129,31 @@ Show: home page.
 
 > "And there's a CSV export so finance or procurement can take this offline right after standup."
 
-### Beat 3 (1:30–2:30) — The scan side
+### Beat 3 (1:55–3:00) — The scan side
 
 Phone view, or 375px wide DevTools.
 
-> "Now the tech side. Phone, gloves, cold dock bay, scanner in one hand or just the phone camera. I built it for continuous scanning: the success message stays visible while the input clears and re-focuses for the next scan. No auto-dismiss timer. No waiting."
+> "Now the tech side. Phone, gloves, cold dock bay, scanner in one hand or just the phone camera.
 >
-> [Show /tech/receive, scan C0009101 with a fresh serial → success → input is already ready for next]
+> I built it for continuous scanning: the success message stays visible while the input clears and re-focuses for the next scan.
 >
-> "When the tag is already on file — which is common at the dock — the form fills in from the existing record. The tech reads it, glances at the unit, and confirms. If they edit any field, it turns amber with an 'edited' tag, so they can see they're about to flag a mismatch."
+> No auto-dismiss timer. No waiting."
+
+[Show /tech/receive, scan C0009101 with a fresh serial → success → input ready again]
+
+> "When the tag is already on file — which is common at the dock — the form fills in from the existing record.
 >
-> [Scan C0000101 — known asset. Banner shows "Tag already on file" with state badge.]
+> The tech checks the unit and confirms.
 >
-> "Errors are specific to the cause. If the tech scans a location label where the tag should go — easy to do at 11pm — the app sees the LOC prefix and tells them which scan to do first, instead of just saying 'invalid format'."
+> If they edit any field, it turns amber with an 'edited' badge, so they can see they're about to flag a mismatch."
+
+[Scan C0000101 — known asset. Banner shows "Tag already on file" with state badge.]
+
+> "Errors are specific to the cause.
 >
-> [Try scanning a LOC| payload into the tag input → specific error message]
+> If the tech scans a location label where the tag should go — easy to do at 11pm — the app sees the LOC prefix and tells them which scan to do first, instead of just saying 'invalid format'."
+
+[Try scanning a LOC| payload into the tag input → specific error message]
 
 ### Beat 4 (2:30–3:15) — One call I almost made the other way, and one piece of writing I'm proud of
 
