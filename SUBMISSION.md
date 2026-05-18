@@ -155,11 +155,29 @@ Phone view, or 375px wide DevTools.
 
 [Try scanning a LOC| payload into the tag input → specific error message]
 
-### Beat 4 (2:30–3:15) — One call I almost made the other way, and one piece of writing I'm proud of
+### Beat 4 (3:00–3:50) — One call I almost made the other way, and one piece of writing I'm proud of
 
-> "One design call: I almost left the success banner on a four-second auto-dismiss timer. It looked great in a demo. But it was wrong for the actual job. A tech in the middle of a scan rhythm is already reaching for the next box. Four seconds is long enough to feel slow, and short enough to feel anxious. What I shipped instead: the banner stays until the next scan replaces it. The input clears and re-focuses right away. On phones, the device gives a short double-buzz on success so the tech can tell what happened without looking."
+**4a — the design call.** Stay on `/tech/receive` (phone view, carrying over from Beat 3).
+
+> "One design call: I almost left the success banner on a four-second auto-dismiss timer.
 >
-> "And one piece of writing I'd point out: the empty state on the reconcile page when nothing is broken — 'All three systems agree on every asset. Most weeks you'll have something here — enjoy the quiet one.' Most empty states pretend that no data is normal. This one says outright that it's the rare case."
+> It looked great in a demo. But it was wrong for the actual job.
+>
+> A tech in the middle of a scan rhythm is already reaching for the next box. Four seconds is long enough to feel slow, and short enough to feel anxious.
+>
+> What I shipped instead: the banner stays until the next scan replaces it. The input clears and re-focuses right away.
+>
+> On phones, the device gives a short double-buzz on success so the tech can tell what happened without looking."
+
+**4b — the microcopy.** Still on `/tech/receive`. Scan tag `C0000101` so the "Tag already on file" prefill banner appears on screen.
+
+> "And one piece of writing I'd point at — right here, the banner that appears when a tag is already on file:
+>
+> 'Fields prefilled from the existing record. If the unit in your hand matches, just hit submit and we'll log a duplicate. If the serial is different, edit it and we'll surface the conflict.'
+>
+> Three sentences, three jobs: explain why the form looks prefilled, tell the tech what the happy path is, and tell them what the divergent path looks like.
+>
+> The microcopy is the documentation for the duplicate-receive flow. I never had to teach a tech how this works."
 
 ### Beat 5 (3:15–3:45) — Wrap
 
