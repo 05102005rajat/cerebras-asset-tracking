@@ -175,7 +175,7 @@ Phone view, or 375px wide DevTools.
 >
 > 'Fields prefilled from the existing record. If the unit in your hand matches, just hit submit and we'll log a duplicate. If the serial is different, edit it and we'll surface the conflict.'
 >
-> Three sentences, three jobs: explain why the form looks prefilled, tell the tech what the happy path is, and tell them what the divergent path looks like.
+> Each sentence does one job — why it's prefilled, what the happy path is, what the conflict path looks like.
 >
 > The microcopy is the documentation for the duplicate-receive flow. I never had to teach a tech how this works."
 
