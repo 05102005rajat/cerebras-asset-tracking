@@ -73,7 +73,7 @@ export function guidanceForCode(
 ): string {
   switch (code) {
     case "and_match_failed": {
-      const existing = details?.["existing_serial"];
+      const existing = details?.["expected_serial"];
       return existing
         ? `Tag is already on file with serial ${String(
             existing,

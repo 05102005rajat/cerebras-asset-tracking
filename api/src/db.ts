@@ -69,7 +69,6 @@ function initSchema(db: Database.Database): void {
 }
 
 function seedDatabase(db: Database.Database): void {
-  const seededAt = "2026-01-02T09:00:00.000Z";
   const insertAsset = db.prepare(`
     INSERT INTO assets (asset_tag, serial, model, manufacturer, asset_class, state, location_json, custodian, parent_asset_tag, procurement_note, created_at, updated_at)
     VALUES (@asset_tag, @serial, @model, @manufacturer, @asset_class, @state, @location_json, @custodian, @parent_asset_tag, @procurement_note, @created_at, @updated_at)
@@ -78,6 +77,12 @@ function seedDatabase(db: Database.Database): void {
     INSERT INTO events (id, asset_tag, event_type, from_state, to_state, from_location_json, to_location_json, user_id, scan_payload, timestamp)
     VALUES (@id, @asset_tag, @event_type, @from_state, @to_state, @from_location_json, @to_location_json, @user_id, @scan_payload, @timestamp)
   `);
+  // Corrects each asset's updated_at to the timestamp of its own last event
+  // once the full per-asset timeline below is known -- see the note at the
+  // end of the loop body.
+  const finalizeUpdatedAt = db.prepare(
+    `UPDATE assets SET updated_at = @updated_at WHERE asset_tag = @asset_tag`,
+  );
 
   const receivingLoc: Location = {
     site: "Lab-Building-A",
@@ -89,6 +94,14 @@ function seedDatabase(db: Database.Database): void {
 
   const tx = db.transaction(() => {
     for (const asset of [...SEED_ASSETS, ...PROCEDURAL_ASSETS]) {
+      let baseTime = new Date("2025-08-01T12:00:00.000Z").getTime();
+      const stepMs = 7 * 24 * 60 * 60 * 1000;
+
+      const initialReceiveAt = new Date(baseTime).toISOString();
+      const userId = asset.custodian.startsWith("tech-")
+        ? asset.custodian
+        : "tech-carlos";
+
       insertAsset.run({
         asset_tag: asset.asset_tag,
         serial: asset.serial,
@@ -100,17 +113,11 @@ function seedDatabase(db: Database.Database): void {
         custodian: asset.custodian,
         parent_asset_tag: asset.parent_asset_tag,
         procurement_note: asset.procurement_note,
-        created_at: seededAt,
-        updated_at: seededAt,
+        created_at: initialReceiveAt,
+        // Placeholder -- corrected below to the timestamp of this asset's
+        // own last event once the timeline has been generated.
+        updated_at: initialReceiveAt,
       });
-
-      let baseTime = new Date("2025-08-01T12:00:00.000Z").getTime();
-      const stepMs = 7 * 24 * 60 * 60 * 1000;
-
-      const initialReceiveAt = new Date(baseTime).toISOString();
-      const userId = asset.custodian.startsWith("tech-")
-        ? asset.custodian
-        : "tech-carlos";
 
       insertEvent.run({
         id: ulid(),
@@ -124,6 +131,7 @@ function seedDatabase(db: Database.Database): void {
         scan_payload: `RECEIVE|${asset.asset_tag}|${asset.serial}`,
         timestamp: initialReceiveAt,
       });
+      let lastEventAt = initialReceiveAt;
 
       baseTime += stepMs;
       let currentState: AssetState = "received";
@@ -134,6 +142,7 @@ function seedDatabase(db: Database.Database): void {
         const nextState = findTransition(currentState, via);
         if (!nextState) break;
         const eventLoc = via === "store" || via === "deploy" ? asset.location : currentLoc;
+        const eventTimestamp = new Date(baseTime).toISOString();
         insertEvent.run({
           id: ulid(),
           asset_tag: asset.asset_tag,
@@ -144,11 +153,19 @@ function seedDatabase(db: Database.Database): void {
           to_location_json: JSON.stringify(eventLoc),
           user_id: userId,
           scan_payload: `${via.toUpperCase()}|${asset.asset_tag}`,
-          timestamp: new Date(baseTime).toISOString(),
+          timestamp: eventTimestamp,
         });
+        lastEventAt = eventTimestamp;
         currentState = nextState;
         currentLoc = eventLoc;
         baseTime += stepMs;
+      }
+
+      // Stamp updated_at with this asset's own last event time (not a
+      // shared constant) so /manager's default updated_at:desc sort and the
+      // relativeTime labels reflect each asset's real last-touched time.
+      if (lastEventAt !== initialReceiveAt) {
+        finalizeUpdatedAt.run({ asset_tag: asset.asset_tag, updated_at: lastEventAt });
       }
     }
   });

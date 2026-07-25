@@ -13,7 +13,9 @@ import type {
 // hand-crafted assets in seed/assets.ts hold all the deliberately-engineered
 // drift.
 //
-// Deterministic: every call produces the same data. No randomness, no Date.now().
+// Deterministic: every call within a process lifetime produces the same
+// data. No randomness. The one exception is PROCEDURAL_FACILITIES.last_observed,
+// which is anchored to module-load time -- see the comment above that export.
 
 type SeedAsset = Omit<Asset, "created_at" | "updated_at">;
 
@@ -121,6 +123,15 @@ const ASSETS_INTERNAL: EnrichedAsset[] = Array.from({ length: COUNT }, (_, i) =>
 export const PROCEDURAL_ASSETS: SeedAsset[] = ASSETS_INTERNAL.map(({ _modelBaseValue, ...rest }) => rest);
 
 // Facilities only tracks racked equipment. So in_service only.
+//
+// last_observed is anchored to module-load time (evaluated once below, not
+// per-request) rather than a fixed calendar literal. reconcile.ts's
+// stale_facilities_observation check compares this against live wall-clock
+// `now` with a 30-day window, so a hardcoded past date would silently flag
+// every one of these ~700 "clean" rows as stale the moment more than 30 days
+// elapsed since that literal was written -- exactly the drift this
+// procedural baseline is supposed to be free of.
+const proceduralFacilitiesSeedTime = new Date().toISOString();
 let facilitySeq = 2000;
 export const PROCEDURAL_FACILITIES: FacilitiesRecord[] = ASSETS_INTERNAL
   .filter((a) => a.state === "in_service")
@@ -130,7 +141,7 @@ export const PROCEDURAL_FACILITIES: FacilitiesRecord[] = ASSETS_INTERNAL
     rack_location: [a.location.site, a.location.room, a.location.row, a.location.rack, a.location.ru]
       .filter(Boolean)
       .join("/"),
-    last_observed: "2026-05-09T03:00:00Z",
+    last_observed: proceduralFacilitiesSeedTime,
   }));
 
 // Finance tracks every asset. Disposed assets are "retired" on finance's side;
