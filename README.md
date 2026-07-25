@@ -1,13 +1,27 @@
 # Asset tracking — Cerebras AI Builder Challenge submission
 
+**Live app:** [cerebras-asset-tracking-starter.vercel.app](https://cerebras-asset-tracking-starter.vercel.app) &nbsp;·&nbsp; **Stack:** Next.js 15 (App Router) · React 19 · TypeScript · Fastify · better-sqlite3 · Vitest
+
 Submission for the Cerebras AI Builder Challenge (asset tracking).
 
-A multi-site research lab tracks instruments across three systems that disagree by default — operations, facilities, finance. This app is the place techs and managers come to keep them aligned.
+A multi-site research lab tracks instruments across three systems that disagree by default — operations, facilities, finance. This is a full-stack Next.js/TypeScript system built around a server-side three-way reconciliation join: it diffs all three sources, classifies every disagreement into a `needs_action` / `watch` / `info` severity taxonomy tuned to the action a manager would actually take, and pairs that with a phone-first scan UI (keyboard-wedge scanner + camera barcode input) for the tech workflows that keep the three systems in sync in the first place.
 
-- **Tech surface (`/tech`)**: receive, store, deploy, transfer. Built for one hand on a phone in a cold dock bay. Keyboard-wedge scanners and phone cameras both work. Continuous-scan mode: the success banner stays visible while the input immediately re-arms for the next scan — no auto-dismiss timer, no waiting.
+- **Tech surface (`/tech`)**: receive, store, deploy, transfer. Built for one hand on a phone in a cold dock bay. Keyboard-wedge scanners and phone cameras both work (`@zxing/browser`). Continuous-scan mode: the success banner stays visible while the input immediately re-arms for the next scan — no auto-dismiss timer, no waiting.
 - **Manager surface (`/manager`)**: paginated, filterable asset list with a drift topline, sortable column headers, sticky table header on scroll, drift dots on rows that need attention, removable filter chips, and filter state preserved through to the asset detail page.
-- **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff. Ghost issues link directly to `/tech/receive?tag=…` because the action is to receive the asset for the first time. **Export CSV** so the manager can pipe the list into whatever tool their procurement team actually uses.
-- **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed). Print stylesheet collapses the page chrome and forces one card per row.
+- **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff. Ghost issues link directly to `/tech/receive?tag=…` because the action is to receive the asset for the first time. **Export CSV** (RFC-4180, formula-injection-safe) so the manager can pipe the list into whatever tool their procurement team actually uses.
+- **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes (server-rendered via `bwip-js`) for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed). Print stylesheet collapses the page chrome and forces one card per row.
+
+## Highlights
+
+- **Three-way reconciliation engine.** A server-side join (`app/api/reconcile/route.ts` → `lib/reconcile.ts`) across operations, facilities, and finance records that classifies every disagreement into `needs_action` / `watch` / `info` and correctly catches all 8 deliberately-seeded drift cases in the test data — rack mismatches, a disposed-but-capitalized asset, ghost records in facilities/finance, a stale-observation case, and a received-but-never-billed asset.
+- **59 passing Vitest unit tests** across 7 suites, pinning the reconciliation classifier, the scan write-back orchestrator, the location payload parser/normalizer, tag validation, sort-key logic, and the CSV exporter (see [Architecture notes](#architecture-notes) for the per-file breakdown).
+- **Found and fixed 5 real bugs** on the live deploy, independent of the original brief:
+  - A broken `/health` proxy route returning 404 — the proxy's blind path-join sent `/health` under `API_BASE_URL` (i.e. `/v1/health`) instead of the upstream root where it actually lives.
+  - A **CSV formula-injection vulnerability** in the reconcile export — free-text upstream fields (finance site, asset model, rack location) written verbatim meant a value starting with `=`, `+`, `-`, or `@` would execute as a formula in Excel/Sheets on open. Fixed with the OWASP-standard leading-quote neutralization, plus regression tests.
+  - A **stale-seed-data bug**: a hardcoded facilities-observation timestamp meant the 30-day staleness check falsely flagged ~700 of the 1,012 seeded assets as drifted once real time passed the literal date. Fixed by anchoring the timestamp to seed/module-load time instead of a fixed calendar literal.
+  - A **timestamp bug** that stamped every seeded asset's `updated_at` with the same shared constant, collapsing the manager dashboard's default sort and every relative-time ("2 days ago") label to one fake value. Fixed to reflect each asset's actual last-event time.
+  - A **dead error-guidance code path**: the serial-conflict error message read `details.existing_serial`, but the API returns the conflicting value under `expected_serial`, so the purpose-written guidance sentence never fired and every conflict fell through to a generic message.
+- **Self-hosted the full stack.** Diagnosed that the brief's "hosted API" didn't exist for candidates, then independently deployed the Next.js frontend to Vercel and the Fastify/better-sqlite3 API to Render (Docker), fixing two upstream incompatibilities along the way — a pnpm/corepack-vs-Node-20-Alpine build failure and a CVE-blocked Next.js version — so the app runs end to end against real seeded data rather than a mock.
 
 ## Quick start
 
@@ -116,12 +130,12 @@ test/
   scan-server.test.ts                # 7 tests — orchestration (writes for deploy, de-rack, no-write paths)
   locations.test.ts                  # 15 tests — payload encoder/parser + rack normalizer
   tag-validate.test.ts               # 5 tests — context-aware scan rejection (LOC|/BADGE|/garbage)
-  csv.test.ts                        # 4 tests — RFC-4180 reconcile export
+  csv.test.ts                        # 6 tests — RFC-4180 reconcile export + formula-injection neutralization
   ScanInput.test.tsx                 # 3 tests (provided)
   sort-assets.test.ts                # 7 tests — sort key parsing + lifecycle-ordered state
 ```
 
-57 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
+59 tests, all green. The classifier, the orchestrator, and the location parser are the things whose behavior I want pinned — they're pure-ish (the orchestrator is mocked at the api-client boundary) and they encode the policy decisions. The React components don't get unit tests; component-test cost is high and the value is low at this code volume.
 
 ## Pushback on the brief
 
@@ -150,11 +164,19 @@ Three sentences, three jobs: explain why the form looks pre-filled, tell them wh
 
 ## Tech stack
 
-- Next.js 15 (App Router) + React 19
-- TypeScript, Tailwind 3
-- `@zxing/browser` for the camera scanner (lazy-imported so non-camera flows skip the bundle)
-- `bwip-js` for server-rendered Code 128 PNGs on the barcode page
-- Vitest for unit tests
+**Frontend** (`starter/`)
+- Next.js 15 (App Router) + React 19, TypeScript, Tailwind 3
+- `@zxing/browser` for the camera barcode scanner (lazy-imported so non-camera flows skip the bundle)
+- `bwip-js` for server-rendered Code 128 PNGs on the barcode test sheet
+- Vitest + Testing Library for unit tests, `tsc --noEmit` for type-checking
+
+**API** (`api/`)
+- Fastify (Node.js + TypeScript) with `@fastify/cors`
+- `better-sqlite3` for storage, `zod` for request schema validation, `ulid` for sortable event IDs
+- Dockerized; deployed independently of the frontend
+
+**Deployment**
+- Frontend on Vercel, API on Render (Docker, auto-detected from `api/Dockerfile`)
 
 ## Accessibility & polish
 
