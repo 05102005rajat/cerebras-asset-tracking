@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 // upstream status code are passed through unchanged.
 
 const UPSTREAM = (process.env.API_BASE_URL ?? "http://localhost:8080/v1").replace(/\/$/, "");
+// /health is a sibling of /v1 at the upstream root (see api/src/routes/utility.ts),
+// not nested under it. Every other path is joined under UPSTREAM as-is.
+const UPSTREAM_ROOT = UPSTREAM.replace(/\/v1$/, "");
 
 function missingToken(): NextResponse {
   return NextResponse.json(
@@ -28,7 +31,8 @@ async function forward(req: NextRequest, segments: string[]): Promise<Response> 
 
   const path = segments.join("/");
   const search = req.nextUrl.search ?? "";
-  const url = `${UPSTREAM}/${path}${search}`;
+  const base = path === "health" ? UPSTREAM_ROOT : UPSTREAM;
+  const url = `${base}/${path}${search}`;
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,

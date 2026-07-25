@@ -59,4 +59,53 @@ describe("reportToCsv", () => {
     const lastRow = csv.trimEnd().split("\r\n").pop()!;
     expect(lastRow.endsWith(",,,")).toBe(true);
   });
+
+  it("neutralizes formula-injection payloads in upstream-sourced fields", () => {
+    const injected: ReconcileReport = {
+      ...report,
+      issues: [
+        {
+          severity: "watch",
+          category: "site_mismatch",
+          asset_tag: "C0000101",
+          headline: "Building disagreement with finance",
+          detail: "test",
+          comparison: {
+            label: "site",
+            ops: "lab-a",
+            finance: '=HYPERLINK("http://evil.example/steal","Open")',
+          },
+        },
+      ],
+    };
+    const csv = reportToCsv(injected);
+    const lastRow = csv.trimEnd().split("\r\n").pop()!;
+    // The formula must not appear at the start of a cell unescaped — it should
+    // be prefixed with a leading single quote so spreadsheet software treats
+    // it as literal text instead of executing it.
+    expect(lastRow).toContain('"\'=HYPERLINK(""http://evil.example/steal"",""Open"")"');
+    expect(lastRow).not.toContain('"=HYPERLINK(');
+  });
+
+  it("neutralizes +, -, and @ leading characters too", () => {
+    for (const payload of ["+1+1", "-2+3", "@SUM(A1:A9)"]) {
+      const injected: ReconcileReport = {
+        ...report,
+        issues: [
+          {
+            severity: "info" as const,
+            category: "site_mismatch",
+            asset_tag: "C0000102",
+            headline: "test",
+            detail: payload,
+          },
+        ],
+      };
+      const csv = reportToCsv(injected);
+      // The raw payload should never appear at the start of its cell — it
+      // must be prefixed with a leading single quote wherever it lands.
+      expect(csv).toContain(`'${payload}`);
+      expect(csv).not.toMatch(new RegExp(`,${payload.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    }
+  });
 });

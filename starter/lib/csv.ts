@@ -2,11 +2,21 @@ import type { Issue, ReconcileReport } from "./reconcile";
 
 // Minimal RFC-4180 CSV encoder. Quotes any field that contains a comma,
 // quote, or newline; doubles inner quotes. No dependency, no surprises.
+//
+// Also guards against CSV/formula injection: fields are built from free-text
+// upstream data (asset model, finance site, facilities rack location, etc.)
+// that this app doesn't control. Excel/Sheets treats a leading =, +, -, or @
+// as the start of a formula, so a value like `=HYPERLINK("http://evil","Open")`
+// would execute on open. Prefixing those fields with a single quote keeps
+// them literal text without changing what a human sees in the sheet.
+const FORMULA_LEADING_CHAR = /^[=+\-@\t\r]/;
+
 function quote(s: string): string {
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
+  const safe = FORMULA_LEADING_CHAR.test(s) ? `'${s}` : s;
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return s;
+  return safe;
 }
 
 function row(cells: (string | number | undefined | null)[]): string {
