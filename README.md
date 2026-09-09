@@ -11,6 +11,24 @@ A multi-site research lab tracks instruments across three systems that disagree 
 - **Reconciliation (`/manager/reconcile`)**: server-side join of all three sources, classified into *needs action / watch / info* and grouped by category — not a raw diff. Ghost issues link directly to `/tech/receive?tag=…` because the action is to receive the asset for the first time. **Export CSV** (RFC-4180, formula-injection-safe) so the manager can pipe the list into whatever tool their procurement team actually uses.
 - **Test sheet (`/dev/barcodes`)**: print-ready Code 128 barcodes (server-rendered via `bwip-js`) for assets, locations, and badges, picked to cover the interesting edge cases (drifted, ghost, disposed). Print stylesheet collapses the page chrome and forces one card per row.
 
+| | |
+|---|---|
+| **Reconciliation** | 3 sources joined server-side, 8/8 seeded drift cases caught |
+| **Tests** | 59 Vitest tests across 7 suites |
+| **Routes** | 17, all returning 200 on the live deploy |
+| **Export** | RFC-4180 CSV, formula-injection safe |
+
+## Why I built it
+
+Built for the Cerebras AI Builder Challenge. The brief describes a lab tracking
+instruments across operations, facilities and finance, and the real difficulty is
+that those three systems disagree by default.
+
+That reframes the product question. A raw diff of three tables is easy and
+useless, because a manager cannot act on "these fields differ." What they need is
+the disagreement sorted by what they are supposed to do about it, which is why
+reconciliation here returns categories rather than diffs.
+
 ## Highlights
 
 - **Three-way reconciliation engine.** A server-side join (`app/api/reconcile/route.ts` → `lib/reconcile.ts`) across operations, facilities, and finance records that classifies every disagreement into `needs_action` / `watch` / `info` and correctly catches all 8 deliberately-seeded drift cases in the test data — rack mismatches, a disposed-but-capitalized asset, ghost records in facilities/finance, a stale-observation case, and a received-but-never-billed asset.
@@ -195,15 +213,6 @@ Three sentences, three jobs: explain why the form looks pre-filled, tell them wh
 - **Reset endpoint.** `POST /api/upstream/reset` re-seeds the namespace. Run it before recording the Loom so the demo runs against known state.
 - **Why `/api/scans/*` and not just `/api/upstream/scans/*`?** See call #1 above. The upstream proxy is still there and is still what the browser hits for read endpoints (assets list, asset get, history) — only writes go through the orchestrator.
 
-## Submitting
-
-Per the challenge brief, the submission has three pieces:
-
-- **Public URL** — once deployed (Vercel one-click works)
-- **Repo link** — this fork
-- **3–5 minute Loom** — features built, one alternative design call, one piece of microcopy
-
-The deployed URL and Loom go in the form at <https://forms.gle/6gxhe8Js98KGqSDx8>.
 
 ---
 
